@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "lic-compatible-tool"
+version = "0.1.0"
+description = "A tool to analyze the compatibility of licenses in a project."
+authors = ["Zion <liu602495126@gmail.com>", "Zihao Zhang <zhzihao2023@lzu.edu.cn>"]
+readme = "README.md"
+include = [ 
+    { path = "lic_compatible_tool/resources/*.json", format = ["sdist", "wheel"] },
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+networkx = "^3.2.1"
+loguru = "^0.7.2"
+matplotlib = "^3.8.3"
+
+[tool.poetry.scripts]
+lict = "lic_compatible_tool.app:cli"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -4,34 +4,42 @@
 
 开源许可证兼容性分析工具，基于结构化的许可证信息和具体场景的依赖行为与构建设置，对目标中引入的开源许可证进行兼容性分析。
 
+尽管我们会尽力确保该工具的准确性和可靠性，但**本项目的检查结果不构成任何法律建议**。使用者应自行审查和判断，以确定所采取的行动是否符合法律法规以及相关许可证的规定。
+
+**注意：本项目当前仍处于早期版本，相关结果的准确性未进行验证，且迭代过程中各模块接口将会发生较大变化。**
+
 #### 软件架构
 
-软件架构说明
+*待补充*
 
 #### 安装教程
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+0. 确保已经安装 `python 3.11^`
+1. clone 仓库
+2. 进入仓库根目录 `pip install .`
 
 #### 使用说明
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+确保工具安装后，终端输入指令 `lict --help`
+
+```shell
+usage: lict [-h] (--sbom SBOM | --sbom_file SBOM_FILE) [--output OUTPUT] [--log-level LOG_LEVEL] [--beauty] [--reinfer]
+
+部件兼容性分析工具
+
+options:
+  -h, --help            show this help message and exit
+  --sbom SBOM           部件sbom参数JSON字符串
+  --sbom_file SBOM_FILE
+                        部件sbom参数JSON文件清单路径
+  --output OUTPUT       输出文件路径
+  --log-level LOG_LEVEL
+                        日志级别
+  --beauty              美化输出
+  --reinfer             强制更新知识库
+```
 
 #### 参与贡献
 
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
+参见[设计文档](doc/设计文档.md#开发手册)
 
-#### 特技
-
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)

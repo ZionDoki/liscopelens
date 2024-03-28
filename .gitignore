@@ -1,0 +1,10 @@
+dist
+__pycache__
+
+*.pyc
+*.gml
+*.png
+*.json
+*.ipynb
+
+!data/*.json
