@@ -7,4 +7,4 @@ __pycache__
 *.json
 *.ipynb
 
-!data/*.json
+!*/resources/*.json
