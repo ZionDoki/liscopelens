@@ -1,22 +1,31 @@
 [tool.poetry]
-name = "lic-compatible-tool"
+name = "lict"
 version = "0.1.0"
 description = "A tool to analyze the compatibility of licenses in a project."
-authors = ["Bird <bird@lzu.edu.cn>", "ZionMoe <liu602495126@gmail.com>", "Zihao Zhang <zhzihao2023@lzu.edu.cn>"]
+authors = ["Bird <bird@lzu.edu.cn>", "ZI0N <liuza20@lzu.edu.cn>", "Zihao Zhang <zhzihao2023@lzu.edu.cn>"]
 readme = "README.md"
 include = [ 
-    { path = "lic_compatible_tool/resources/*.json", format = ["sdist", "wheel"] },
+    { path = "lict/resources/*.toml", format = ["sdist", "wheel"] },
+    { path = "lict/resources/*.gml", format = ["sdist", "wheel"] },
 ]
 
 [tool.poetry.dependencies]
 python = "^3.11"
 networkx = "^3.2.1"
-loguru = "^0.7.2"
 matplotlib = "^3.8.3"
+toml = "^0.10.2"
+rich = "^13.7.1"
 
 [tool.poetry.scripts]
-lict = "lic_compatible_tool.app:cli"
+lict = "lict.app:cli"
+
+[tool.poetry.group.dev.dependencies]
+numpy = "^1.26.4"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.source]]
+name = "tsinghua"
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"

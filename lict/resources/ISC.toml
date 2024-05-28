@@ -1,0 +1,27 @@
+[can.private_use]
+escape_scope = []
+protect_scope = []
+
+[can.commercial_use]
+escape_scope = []
+protect_scope = []
+
+[can.distribute]
+escape_scope = []
+protect_scope = []
+
+[can.modify]
+escape_scope = []
+protect_scope = []
+
+[must.include_copyright]
+escape_scope = []
+protect_scope = []
+
+[must.include_license]
+escape_scope = []
+protect_scope = []
+
+[cannot.provide_warranty]
+escape_scope = []
+protect_scope = []

@@ -1,0 +1,39 @@
+human_review = false
+
+[cannot]
+
+[can.modify]
+protect_scope = []
+escape_scope = []
+
+[can.distribute]
+protect_scope = []
+escape_scope = []
+
+[can.commercial_use]
+protect_scope = []
+escape_scope = []
+
+[can.provide_warranty]
+protect_scope = []
+escape_scope = []
+
+[must.include_copyright]
+protect_scope = []
+escape_scope = []
+
+[must.include_license]
+protect_scope = []
+escape_scope = []
+
+[must.include_notice]
+protect_scope = []
+escape_scope = []
+
+[must.disclose_source]
+protect_scope = []
+escape_scope = []
+
+[must.state_changes]
+protect_scope = []
+escape_scope = []

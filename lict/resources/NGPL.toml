@@ -1,0 +1,33 @@
+human_review = false
+
+[can.distribute]
+protect_scope = []
+escape_scope = []
+
+[can.modify]
+protect_scope = []
+escape_scope = []
+
+[can.provide_warranty]
+protect_scope = []
+escape_scope = []
+
+[cannot.sublicense]
+protect_scope = []
+escape_scope = []
+
+[must.include_copyright]
+protect_scope = []
+escape_scope = []
+
+[must.include_license]
+protect_scope = []
+escape_scope = []
+
+[must.state_changes]
+protect_scope = []
+escape_scope = []
+
+[must.disclose_source]
+protect_scope = []
+escape_scope = []

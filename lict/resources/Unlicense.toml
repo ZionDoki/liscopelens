@@ -1,0 +1,27 @@
+human_review = false
+
+[must]
+
+[can.commercial_use]
+protect_scope = []
+escape_scope = []
+
+[can.private_use]
+protect_scope = []
+escape_scope = []
+
+[can.modify]
+protect_scope = []
+escape_scope = []
+
+# [can.provide_warranty]
+# protect_scope = []
+# escape_scope = []
+
+# [cannot.include_copyright]
+# protect_scope = []
+# escape_scope = []
+
+[cannot.provide_warranty]
+protect_scope = []
+escape_scope = []

@@ -1,0 +1,39 @@
+[can.private_use]
+protect_scope = []
+escape_scope = []
+
+[can.commercial_use]
+escape_scope = []
+protect_scope = []
+
+[can.distribute]
+escape_scope = []
+protect_scope = []
+
+[can.modify]
+escape_scope = []
+protect_scope = []
+
+[can.patent_grant]
+escape_scope = []
+protect_scope = []
+
+[cannot.patent_suit]
+escape_scope = []
+protect_scope = []
+
+[cannot.provide_warranty]
+escape_scope = []
+protect_scope = []
+
+[cannot.use_trademark]
+protect_scope = ["trademark"]
+escape_scope = []
+
+[must.include_copyright]
+escape_scope = []
+protect_scope = []
+
+[must.include_license]
+escape_scope = []
+protect_scope = []

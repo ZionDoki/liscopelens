@@ -1,0 +1,7 @@
+[can.modify]
+protect_scope = []
+escape_scope = []
+
+[cannot.distribute]
+protect_scope = []
+escape_scope = ["dynamic_link"]

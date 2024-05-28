@@ -1,0 +1,37 @@
+human_review = false
+
+[can.commercial_use]
+protect_scope = []
+escape_scope = []
+
+[can.modify]
+protect_scope = []
+escape_scope = []
+
+[can.distribute]
+protect_scope = []
+escape_scope = []
+
+[can.sublicense]
+protect_scope = []
+escape_scope = []
+
+[can.private_use]
+protect_scope = []
+escape_scope = []
+
+[can.patent_grant]
+protect_scope = []
+escape_scope = []
+
+[cannot.provide_warranty]
+protect_scope = []
+escape_scope = []
+
+[must.include_copyright]
+protect_scope = []
+escape_scope = []
+
+[must.include_license]
+protect_scope = []
+escape_scope = []

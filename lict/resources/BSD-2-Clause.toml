@@ -1,0 +1,39 @@
+[can.private_use]
+escape_scope = []
+protect_scope = [ "source_code", "binary_form",]
+
+[can.commercial_use]
+escape_scope = []
+protect_scope = [ "source_code", "binary_form",]
+
+[can.modify]
+escape_scope = []
+protect_scope = [ "source_code", "binary_form",]
+
+[must.disclose_source]
+escape_scope = []
+protect_scope = [ "source_code",]
+
+[must.distribute]
+escape_scope = []
+protect_scope = [ "source_code",]
+
+[must.include_copyright]
+escape_scope = []
+protect_scope = [ "source_code", "binary_form",]
+
+[must.include_license]
+escape_scope = []
+protect_scope = [ "binary_form",]
+
+[must.include_notice]
+escape_scope = []
+protect_scope = [ "source_code", "binary_form",]
+
+[must.state_changes]
+escape_scope = []
+protect_scope = [ "source_code",]
+
+[cannot.provide_warranty]
+escape_scope = []
+protect_scope = []

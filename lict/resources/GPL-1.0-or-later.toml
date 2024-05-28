@@ -1,0 +1,59 @@
+[can.private_use]
+escape_scope = []
+protect_scope = []
+
+[can.commercial_use]
+escape_scope = []
+protect_scope = []
+
+[can.distribute]
+escape_scope = []
+protect_scope = []
+
+[can.modify]
+escape_scope = []
+protect_scope = []
+
+[must.disclose_source]
+escape_scope = []
+protect_scope = []
+
+[must.display_announcement]
+escape_scope = []
+protect_scope = []
+
+[must.include_copyright]
+escape_scope = []
+protect_scope = []
+
+[must.include_license]
+escape_scope = []
+protect_scope = []
+
+[must.include_notice]
+escape_scope = []
+protect_scope = []
+
+[must.same_license]
+escape_scope = []
+protect_scope = []
+
+[must.set_same_license]
+escape_scope = []
+protect_scope = []
+
+[must.state_changes]
+escape_scope = []
+protect_scope = []
+
+[cannot.impose_further_restriction]
+protect_scope = []
+escape_scope = ["trademark"]
+
+[cannot.provide_warranty]
+escape_scope = []
+protect_scope = []
+[special.relicense]
+protect_scope = []
+escape_scope = []
+target = ["gpl-3.0-only", "gpl-2.0-only", "gpl-2.0-or-later", "gpl-3.0-or-later"]

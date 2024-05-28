@@ -1,0 +1,124 @@
+[actions.private_use]
+compliance = []
+immutability = []
+
+[actions.commercial_use]
+compliance = []
+immutability = []
+
+[actions.distribute]
+compliance = []
+immutability = []
+
+[actions.modify]
+compliance = []
+immutability = ["cannot"]
+
+[actions.patent_grant]
+compliance = []
+immutability = []
+
+[actions.include_copyright]
+compliance = []
+immutability = []
+
+[actions.include_license]
+compliance = []
+immutability = []
+
+[actions.include_notice]
+compliance = []
+immutability = []
+
+[actions.state_changes]
+compliance = []
+immutability = []
+
+[actions.compensate_damage]
+compliance = []
+immutability = []
+
+[actions.patent_suit]
+compliance = []
+immutability = []
+
+[actions.provide_warranty]
+compliance = []
+immutability = []
+conflicts = [["must", "cannot"]]
+
+[actions.use_trademark]
+compliance = []
+immutability = []
+
+[actions.disclose_source]
+compliance = []
+immutability = []
+
+[actions.give_credit]
+compliance = []
+immutability = []
+
+[actions.contact_author]
+compliance = []
+immutability = []
+
+[actions.impose_further_restriction]
+compliance = ["cannot"]
+immutability = []
+
+[actions.display_announcement]
+compliance = []
+immutability = []
+
+[actions.set_same_license]
+compliance = []
+immutability = []
+
+[actions.set_geographical_condition]
+compliance = []
+immutability = []
+
+[actions.include_original]
+compliance = []
+immutability = []
+
+[actions.display_acknowledgement]
+compliance = []
+immutability = []
+
+[actions.relicense]
+compliance = []
+immutability = []
+
+[actions.triggering]
+compliance = []
+immutability = []
+
+[actions.backward_compatibility]
+compliance = []
+immutability = []
+
+[actions.prevent_distribution]
+compliance = []
+immutability = []
+
+[actions.include_install_instruction]
+compliance = []
+immutability = []
+
+[actions.pay_above_use_threshold]
+compliance = []
+immutability = []
+
+[actions.change_license]
+compliance = []
+immutability = []
+
+[actions.rename]
+compliance = []
+immutability = []
+
+[actions.sublicense]
+compliance = []
+immutability = []

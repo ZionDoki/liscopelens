@@ -1,0 +1,64 @@
+[can.commercial_use]
+protect_scope = []
+escape_scope = []
+
+[can.private_use]
+protect_scope = []
+escape_scope = []
+
+[can.distribute]
+protect_scope = []
+escape_scope = []
+
+[can.modify]
+protect_scope = []
+escape_scope = []
+
+[can.set_geographical_condition]
+protect_scope = []
+escape_scope = []
+
+[cannot.impose_further_restriction]
+protect_scope = []
+escape_scope = ["trademark"]
+
+[cannot.provide_warranty]
+protect_scope = []
+escape_scope = []
+
+[cannot.patent_suit]
+protect_scope = []
+escape_scope = []
+
+[must.disclose_source]
+protect_scope = []
+escape_scope = []
+
+[must.include_license]
+protect_scope = []
+escape_scope = []
+
+[must.include_copyright]
+protect_scope = []
+escape_scope = []
+
+[must.include_original]
+protect_scope = []
+escape_scope = []
+
+[must.include_notice]
+protect_scope = []
+escape_scope = []
+
+[must.set_same_license]
+protect_scope = []
+escape_scope = ["written_authorization"]
+
+[must.state_changes]
+protect_scope = []
+escape_scope = []
+
+[special.triggering]
+protect_scope = []
+escape_scope = []
+target = ["cannot.use_trademark", "cannot.patent_suit"]

@@ -1,0 +1,7 @@
+[can.modify]
+protect_scope = []
+escape_scope = []
+
+[can.distribute]
+protect_scope = []
+escape_scope = ["static_link"]
