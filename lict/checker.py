@@ -1,18 +1,34 @@
 import warnings
 
-from lict.utils.structure import LicenseFeat, Scope
+from lict.infer import generate_knowledge_graph
 from lict.constants import Settings, CompatibleType
+from lict.utils.structure import LicenseFeat, Scope
 from lict.utils import GraphManager, get_resource_path
 
 
 class Checker:
     """Compatibility checker class"""
 
+    _instance = None
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self):
+
+        if Checker._initialized:
+            return
+
+        generate_knowledge_graph()
 
         destination = get_resource_path()
         self.properties_graph = GraphManager(destination.joinpath(Settings.LICENSE_PROPERTY_GRAPH))
         self.compatible_graph = GraphManager(destination.joinpath(Settings.LICENSE_COMPATIBLE_GRAPH))
+
+        Checker._initialized = True
 
     def is_license_exist(self, license_name: str) -> bool:
         """

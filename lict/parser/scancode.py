@@ -4,11 +4,13 @@
 # Contact: liuza20@lzu.edu.cn
 
 import os
+import re
 import json
 import argparse
 from rich.progress import track
 
 from .base import BaseParser
+from lict.checker import Checker
 from lict.utils.graph import GraphManager
 from lict.utils.structure import DualLicense, SPDXParser, Config
 
@@ -26,10 +28,16 @@ class ScancodeParser(BaseParser):
             "help": "The path of the directory that contain json files",
             "group": "scancode",
         },
+        "--rm-ref-lang": {
+            "action": "store_true",
+            "help": "Automatically remove scancode ref prefix and language suffix from spdx ids",
+            "default": False,
+        },
     }
 
     def __init__(self, args: argparse.Namespace, config: Config):
         super().__init__(args, config)
+        self.checker = Checker()
         self.spdx_parser = SPDXParser()
 
     def add_license(self, context: GraphManager, file_path: str, spdx_results: DualLicense):
@@ -41,6 +49,19 @@ class ScancodeParser(BaseParser):
 
         if spdx_results:
             context_node["licenses"] = spdx_results
+
+    def remove_ref_lang(self, spdx_id: str) -> str:
+
+        if not self.checker.is_license_exist(spdx_id):
+            new_spdx_id = re.sub(r"LicenseRef-scancode-", "", spdx_id)
+            if self.checker.is_license_exist(new_spdx_id):
+                return new_spdx_id
+            new_spdx_id = re.sub(r"-(en|cn)$", "", new_spdx_id)
+            if self.checker.is_license_exist(new_spdx_id):
+                return new_spdx_id
+            return spdx_id
+
+        return spdx_id
 
     def parse_json(self, json_path: str, context: GraphManager) -> GraphManager:
 
@@ -61,7 +82,11 @@ class ScancodeParser(BaseParser):
                         file_path = os.path.join(rel_path, match["from_file"])
                     else:
                         file_path = os.path.relpath(match["from_file"], match["from_file"].split(os.sep)[0])
-                    spdx_results = self.spdx_parser(match["license_expression_spdx"], expand=True)
+                    spdx_results = self.spdx_parser(
+                        match["license_expression_spdx"],
+                        expand=True,
+                        proprocessor=self.remove_ref_lang if self.args.rm_ref_lang else None,
+                    )
 
                     self.add_license(context, file_path, spdx_results)
 

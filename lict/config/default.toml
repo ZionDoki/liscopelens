@@ -1,8 +1,11 @@
+license_isolations = ["EXECUTABLE"]
+
 [license_spread]
 spread_conditions = ["STATIC_LINKING", "COMPILE"]
-non_spread_conditions = ["DEFAULT", "DYNAMIC_LINKING"]
+non_spread_conditions = ["DEFAULT", "DYNAMIC_LINKING", "EXECUTABLE"]
 
 [literal_mapping]
 code = "COMPILE"
 shared_library = "DYNAMIC_LINKING"
 static_library = "STATIC_LINKING"
+executable = "EXECUTABLE"

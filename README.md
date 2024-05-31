@@ -39,6 +39,14 @@ options:
   --reinfer             强制更新知识库
 ```
 
+#### 已知问题
+
+1. `poetry install` 无响应或者报错提示包括 `Failed to unlock the collection`.
+
+```shell
+export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
+```
+
 #### 参与贡献
 
 参见[设计文档](doc/设计文档.md#开发手册)

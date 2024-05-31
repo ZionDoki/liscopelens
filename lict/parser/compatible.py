@@ -94,20 +94,21 @@ class BaseCompatiblityParser(BaseParser):
             conflict_flag = False
 
             if ignore_unk:
-                base_group = tuple(filter(lambda x: self.checker.is_license_exist(x[0]), base_group))
-                other_group = tuple(filter(lambda x: self.checker.is_license_exist(x[0]), other_group))
+                base_group = tuple(filter(lambda x: self.checker.is_license_exist(x["spdx_id"]), base_group))
+                other_group = tuple(filter(lambda x: self.checker.is_license_exist(x["spdx_id"]), other_group))
 
-            for (license_a, conds_a), (license_b, conds_b) in itertools.product(base_group, other_group):
+            for license_a, license_b in itertools.product(base_group, other_group):
+                spdx_a, spdx_b = license_a["spdx_id"], license_b["spdx_id"]
+                conds_a = license_a["condition"]
+                conds_b = license_b["condition"]
 
-                if license_a == license_b:
+                if license_a["spdx_id"] == license_b["spdx_id"]:
                     continue
 
                 scope_a = Scope({conds_a: set()}) if conds_a else conds_a
                 scope_b = Scope({conds_b: set()}) if conds_b else conds_b
 
-                # print(scope_a, scope_b)
-
-                result = self.check_compatiblity(license_a, license_b, scope_a, scope_b)
+                result = self.check_compatiblity(spdx_a, spdx_b, scope_a, scope_b)
 
                 if result == CompatibleType.INCOMPATIBLE:
                     conflict_flag = True
@@ -123,7 +124,6 @@ class BaseCompatiblityParser(BaseParser):
     def parse(self, project_path: str, context: GraphManager = None) -> GraphManager:
         ignore_unk = getattr(self.args, "ignore_unk", False)
         output_path = getattr(self.args, "output", "./output.gml")
-        count = 0
 
         for sub in track(nx.weakly_connected_components(context.graph), "Parsing compatibility..."):
             for current_node, parents, children in self.generate_processing_sequence(
@@ -138,9 +138,9 @@ class BaseCompatiblityParser(BaseParser):
                     # * check the current node first that has licenses
                     if node_a == current_node and (license_groups := context.nodes[current_node].get("licenses")):
 
-                        results, _, _ = self.filter_dual_pair(license_groups, ignore_unk=ignore_unk)
+                        results, _, conflict_flag = self.filter_dual_pair(license_groups, ignore_unk=ignore_unk)
 
-                        if not results:
+                        if not results and conflict_flag:
                             edge = self.create_edge(
                                 node_a, node_a, label=CompatibleType.INCOMPATIBLE, type="compatible_result"
                             )
@@ -158,18 +158,19 @@ class BaseCompatiblityParser(BaseParser):
                         if not dual_b:
                             dual_b = context.nodes[node_b].get("outbound_license", None)
 
-                        # * first time vist child node, add condition to the node
-                        if node_a == current_node:
-                            count += 1
-
                         if (node_a == current_node) and dual_b:
-
                             if condition := self.parse_condition(context.nodes[node_b].get("type", None)):
-
                                 context.nodes[node_b]["outbound_license"] = dual_b.add_condition(condition)
-                                pass
+                                if condition in self.config.license_isolations:
+                                    context.nodes[node_b]["license_isolation"] = True
 
                         if not (filtered_a and dual_b):
+                            continue
+
+                        if context.nodes[node_a].get("license_isolation", False):
+                            continue
+
+                        if context.nodes[node_b].get("license_isolation", False):
                             continue
 
                         compatible_a, compatible_b, conflict_flag = self.filter_dual_pair(

@@ -52,7 +52,7 @@ def generate_knowledge_graph(reinfer: bool = False):
 
         infer.check_compatibility(all_licenses)
 
-        for license_name, license in track(all_licenses.items()):
+        for license_name, license in all_licenses.items():
             infer.check_license_property(license)
 
         infer.properties_graph.viz()
