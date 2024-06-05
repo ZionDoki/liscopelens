@@ -202,8 +202,14 @@ class BaseCompatiblityParser(BaseParser):
                     # * 计算出站许可证
                     if filtered_a and (outbound_from_a := filtered_a.get_outbound(self.config)):
 
-                        edge = self.create_edge(current_node, node_a, type="spread_from")
-                        context.add_edge(edge)
+                        origin_nodes = context.get_predecessors_of_type(node_a, edge_type="spread_to")
+                        if origin_nodes:
+                            for origin_node in origin_nodes:
+                                edge = self.create_edge(origin_node, current_node, type="spread_to")
+                                context.add_edge(edge)
+                        else:
+                            edge = self.create_edge(node_a, current_node, type="spread_to")
+                            context.add_edge(edge)
 
                         if current_outbound := context.nodes[current_node].get("outbound_license", None):
                             context.nodes[current_node]["outbound_license"] = current_outbound & outbound_from_a
