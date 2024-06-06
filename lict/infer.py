@@ -13,6 +13,7 @@ from lict.utils.structure import (
     LicenseFeat,
     load_schemas,
     load_licenses,
+    load_exceptions,
     ActionFeatOperator,
 )
 from lict.utils.graph import Edge, GraphManager, Triple, Vertex
@@ -28,7 +29,7 @@ Inferring compatibility based on structured information
 """
 
 
-def generate_knowledge_graph(reinfer: bool = False):
+def generate_knowledge_graph(reinfer: bool = False) -> "CompatibleInfer":
     """
     Infer license compatibility and properties based on structured information,
     generate knowledge graph for further usage.
@@ -36,28 +37,31 @@ def generate_knowledge_graph(reinfer: bool = False):
     Args:
         reinfer (bool): whether to re-infer the compatibility and properties
     Returns:
-        None, but save the knowledge graph to the data directory.
-
-    ?: whether to return status of generation.
+        infer (CompatibleInfer): the infer for license compatibility.
     """
+    schemas = load_schemas()
 
     if (
         reinfer
         or not is_file_in_resources(f"{Settings.LICENSE_PROPERTY_GRAPH}")
         or not is_file_in_resources(f"{Settings.LICENSE_COMPATIBLE_GRAPH}")
     ):
-
-        all_licenses, schemas = load_licenses(), load_schemas()
+        all_licenses = load_licenses()
         infer = CompatibleInfer(schemas=schemas)
-
         infer.check_compatibility(all_licenses)
 
         for license_name, license in all_licenses.items():
             infer.check_license_property(license)
 
         infer.properties_graph.viz()
-
         infer.save()
+
+    infer = CompatibleInfer(schemas=schemas)
+
+    destination = get_resource_path()
+    infer.properties_graph = GraphManager(destination.joinpath(Settings.LICENSE_PROPERTY_GRAPH))
+    infer.compatible_graph = GraphManager(destination.joinpath(Settings.LICENSE_COMPATIBLE_GRAPH))
+    return infer
 
 
 class CompatibleRule(ABC):
@@ -423,9 +427,10 @@ class CompatibleInfer:
     end_rule: str = None
     rules: Dict[str, CompatibleRule] = {}
 
-    def __init__(self, schemas: Schemas = None):
+    def __init__(self, schemas: Schemas = None, exceptions=None):
         self.callback_queque = []
         self.schemas = schemas
+        self.exceptions = exceptions
         self.properties_graph = GraphManager()
         self.compatible_graph = GraphManager()
 
@@ -464,6 +469,26 @@ class CompatibleInfer:
             if license_a == license_b:
                 continue
 
+            edge = None
+            visited = set()
+            current_rule = self.rules[self.start_rule]
+            while not (type(current_rule) == type(self.rules[self.end_rule])):
+                if type(current_rule).__name__ in visited:
+                    raise ValueError(f"Rule {type(current_rule).__name__} is visited twice.")
+
+                visited.add(type(current_rule).__name__)
+                next_rule_type, edge = current_rule(license_a, license_b, self.compatible_graph, edge)
+                current_rule = self.rules[next_rule_type.__name__]
+
+        while len(self.callback_queque) > 0:
+            callback = self.callback_queque.pop(0)
+            callback(self.compatible_graph)
+
+    def infer_parir_compatibility(self, license_a: LicenseFeat, license_b: LicenseFeat):
+        if license_a == license_b:
+            return
+
+        for license_a, license_b in ((license_a, license_b), (license_b, license_a)):
             edge = None
             visited = set()
             current_rule = self.rules[self.start_rule]

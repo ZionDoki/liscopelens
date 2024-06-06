@@ -40,6 +40,7 @@ class Config:
         enum2literal(enum: str) -> set[str]: convert ScopeElement enum to usage literals
         from_toml(path: str) -> Config: load Config from a toml file
     """
+
     license_isolations: list[str] = field(default_factory=list)
     license_spread: LicenseSpread = field(default_factory=LicenseSpread)
     literal_mapping: dict[str, str] = field(default_factory=dict)
@@ -284,6 +285,7 @@ class LicenseFeat:
     cannot: dict[str, ActionFeat] = field(default_factory=dict)
     must: dict[str, ActionFeat] = field(default_factory=dict)
     special: dict[str, ActionFeat] = field(default_factory=dict)
+    scope: dict[str, dict] = field(default_factory=dict)
     human_review: bool = field(default=True)
 
     def __post_init__(self):
@@ -302,8 +304,12 @@ class LicenseFeat:
     def features(self) -> list[ActionFeat]:
         return list(itertools.chain(self.can.values(), self.cannot.values(), self.must.values(), self.special.values()))
 
+    @property
+    def scope_elems(self) -> list[str]:
+        return list(self.scope.keys())
+
     @classmethod
-    def from_toml(cls, path: str) -> list["LicenseFeat"]:
+    def from_toml(cls, path: str) -> "LicenseFeat":
         spdx_id = os.path.basename(path).replace(".toml", "")
         return cls(spdx_id, **toml.load(path))
 
@@ -566,7 +572,25 @@ def load_licenses(path: str = None) -> dict[str, LicenseFeat]:
     """
 
     if path is None:
-        path = get_resource_path()
+        path = get_resource_path(resource_name="resources.licenses")
+
+    paths = filter(lambda x: not x.startswith("schemas") and x.endswith(".toml"), os.listdir(path))
+
+    return {lic.spdx_id: lic for p in paths if (lic := LicenseFeat.from_toml(os.path.join(path, p)))}
+
+
+def load_exceptions(path: str = None) -> dict[str, LicenseFeat]:
+    """
+    Load exceptions from a directory of toml files
+
+    Args:
+        path: path to directory of toml files
+
+    Returns:
+        dict[str, LicenseFeat]: dictionary of exceptions
+    """
+    if path is None:
+        path = get_resource_path(resource_name="resources.exceptions")
 
     paths = filter(lambda x: not x.startswith("schemas") and x.endswith(".toml"), os.listdir(path))
 

@@ -1,5 +1,6 @@
 from .build_gn_parser_wasted import GnParser
 
+from lict.parser.echo import EchoPaser
 from lict.parser.scancode import ScancodeParser
 from lict.parser.base import BaseParser, BaseParserEntry
 from lict.parser.compatible import BaseCompatiblityParser
@@ -10,6 +11,7 @@ class CParserEntry(BaseParserEntry):
         GnParser,
         ScancodeParser,
         BaseCompatiblityParser,
+        EchoPaser,
     )
 
     entry_name: str = "cParser"
