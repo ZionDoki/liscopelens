@@ -253,6 +253,19 @@ class GraphManager:
             node_data: the node data that get from the graph.
         """
         return self.graph.nodes.get(node_label)
+    
+    def get_predecessors_of_type(self, node_label: str, edge_type: str):
+        """
+        get the predecessors of the node with the specific edge type.
+
+        Args:
+            node_label (str): the label of the node.
+            edge_type (str): the type of the edge.
+        
+        Returns:
+            predecessors: the predecessors of the node with the specific edge type.
+        """
+        return [u for u, v, data in self.graph.in_edges(node_label, data=True) if data.get('type') == edge_type]
 
     def edge_subgraph(self, edges: list[EdgeIndex]) -> "GraphManager":
         """ """
