@@ -115,14 +115,14 @@ class GraphManager:
                 self.graph = nx.read_gml(file_path)
 
     @property
-    def nodes(self):
+    def nodes(self, **kwargs):
         """wrapper for the nodes of the networkx."""
-        return self.graph.nodes
+        return self.graph.nodes(**kwargs)
 
     @property
-    def edges(self):
+    def edges(self, **kwargs):
         """wrapper for the edges of the networkx."""
-        return self.graph.edges
+        return self.graph.edges(**kwargs)
 
     @property
     def in_edges(self):
@@ -386,7 +386,7 @@ class GraphManager:
         for edge in filter(lambda x: self._compare_edge(x[3], kwargs), self.graph.edges(data=True, keys=True)):
             yield (edge[0], edge[1], edge[2]), edge[3]
 
-    def filter_nodes(self, **kwargs) -> list[str]:
+    def filter_nodes(self, **kwargs) -> Iterator[tuple[str, dict]]:
         """
         filter the nodes in the graph by the node property dict.
 
@@ -394,10 +394,10 @@ class GraphManager:
             **kwargs: the node property dict used to filter the nodes.
 
         Returns:
-            list[str]: the node label list that get from the graph.
+            Iterator[str, Data]: the node separated by the node label and the node data.
         """
-        node_list = self.graph.nodes.items()
-        return [node_tuple[0] for node_tuple in filter(lambda x: self._compare_node(x[1], kwargs), node_list)]
+        for node in filter(lambda x: self._compare_node(x[1], kwargs), self.graph.nodes(data=True)):
+            yield node[0], node[1]
 
     def modify_node_attribute(self, node_label: str, new_attribute: str, new_value: str):
         """

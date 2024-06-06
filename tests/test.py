@@ -151,8 +151,17 @@ class TestParser(unittest.TestCase):
 class TempTest(unittest.TestCase):
 
     def test(self):
-        result = get_resource_path("test", resource_name="resources.exceptions")
-        print(result.exists())
+        exceptions = load_exceptions()
+        licenses = load_licenses()
+
+        print((*licenses.values(), *exceptions.values()))
+
+        for lic in licenses:
+            for exp in exceptions:
+                print(licenses[lic])
+                print(licenses[lic].cover_from(exceptions[exp]))
+                break
+            break
 
 if __name__ == "__main__":
     unittest.main()

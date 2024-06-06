@@ -111,12 +111,12 @@ class BaseCompatiblityParser(BaseParser):
                 scope_b = Scope({conds_b: set()}) if conds_b else conds_b
 
                 spdx_a_list = (
-                    [spdx_a + " WITH " + exception for exception in license_a["exceptions"]]
+                    [spdx_a + "-with-" + exception for exception in license_a["exceptions"]]
                     if license_a["exceptions"]
                     else [spdx_a]
                 )
                 spdx_b_list = (
-                    [spdx_b + " WITH " + exception for exception in license_b["exceptions"]]
+                    [spdx_b + "-with-" + exception for exception in license_b["exceptions"]]
                     if license_b["exceptions"]
                     else [spdx_b]
                 )

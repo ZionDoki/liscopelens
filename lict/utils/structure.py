@@ -290,14 +290,24 @@ class LicenseFeat:
 
     def __post_init__(self):
         if isinstance(self.can, dict):
-            self.can = {name: ActionFeat(name, **can, modal="can") for name, can in self.can.items()}
+            self.can = {
+                name: (can if isinstance(can, ActionFeat) else ActionFeat(name, **can, modal="can"))
+                for name, can in self.can.items()
+            }
         if isinstance(self.cannot, dict):
-            self.cannot = {name: ActionFeat(name, **cannot, modal="cannot") for name, cannot in self.cannot.items()}
+            self.cannot = {
+                name: (cannot if isinstance(cannot, ActionFeat) else ActionFeat(name, **cannot, modal="cannot"))
+                for name, cannot in self.cannot.items()
+            }
         if isinstance(self.must, dict):
-            self.must = {name: ActionFeat(name, **must, modal="must") for name, must in self.must.items()}
+            self.must = {
+                name: (must if isinstance(must, ActionFeat) else ActionFeat(name, **must, modal="must"))
+                for name, must in self.must.items()
+            }
         if isinstance(self.special, dict):
             self.special = {
-                name: ActionFeat(name, **special, modal="special") for name, special in self.special.items()
+                name: (special if isinstance(special, ActionFeat) else ActionFeat(name, **special, modal="special"))
+                for name, special in self.special.items()
             }
 
     @property
@@ -312,6 +322,15 @@ class LicenseFeat:
     def from_toml(cls, path: str) -> "LicenseFeat":
         spdx_id = os.path.basename(path).replace(".toml", "")
         return cls(spdx_id, **toml.load(path))
+
+    def cover_from(self, other: "LicenseFeat") -> "LicenseFeat":
+        return self.__class__(
+            spdx_id=self.spdx_id + "-with-" + other.spdx_id,
+            can={**self.can, **other.can},
+            cannot={**self.cannot, **other.cannot},
+            must={**self.must, **other.must},
+            special={**self.special, **other.special},
+        )
 
 
 @dataclass
