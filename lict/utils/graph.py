@@ -2,6 +2,7 @@ import os
 import warnings
 
 import networkx as nx
+from typing import Iterator
 from matplotlib import pyplot as plt
 
 """
@@ -114,14 +115,14 @@ class GraphManager:
                 self.graph = nx.read_gml(file_path)
 
     @property
-    def nodes(self):
+    def nodes(self, **kwargs):
         """wrapper for the nodes of the networkx."""
-        return self.graph.nodes
+        return self.graph.nodes(**kwargs)
 
     @property
-    def edges(self):
+    def edges(self, **kwargs):
         """wrapper for the edges of the networkx."""
-        return self.graph.edges
+        return self.graph.edges(**kwargs)
 
     @property
     def in_edges(self):
@@ -241,7 +242,7 @@ class GraphManager:
             edge_index = (edge_index[0], edge_index[1])
 
         return self.graph.get_edge_data(*edge_index)
-    
+
     def get_node_data(self, node_label: str) -> dict:
         """
         get the node data from the graph.
@@ -253,7 +254,7 @@ class GraphManager:
             node_data: the node data that get from the graph.
         """
         return self.graph.nodes.get(node_label)
-    
+
     def get_predecessors_of_type(self, node_label: str, edge_type: str):
         """
         get the predecessors of the node with the specific edge type.
@@ -261,11 +262,11 @@ class GraphManager:
         Args:
             node_label (str): the label of the node.
             edge_type (str): the type of the edge.
-        
+
         Returns:
             predecessors: the predecessors of the node with the specific edge type.
         """
-        return [u for u, v, data in self.graph.in_edges(node_label, data=True) if data.get('type') == edge_type]
+        return [u for u, v, data in self.graph.in_edges(node_label, data=True) if data.get("type") == edge_type]
 
     def edge_subgraph(self, edges: list[EdgeIndex]) -> "GraphManager":
         """ """
@@ -372,7 +373,7 @@ class GraphManager:
         node_dict = {k: tuple(v) if isinstance(v, list) else v for k, v in node_property_dict.items()}
         return set(set(node_dict.items())).issubset(new_d.items())
 
-    def filter_edges(self, **kwargs) -> list[EdgeIndex]:
+    def filter_edges(self, **kwargs) -> Iterator[tuple[EdgeIndex, dict]]:
         """
         filter the edges in the graph by the edge property dict.
 
@@ -380,12 +381,12 @@ class GraphManager:
             **kwargs: the edge property dict used to filter the edges.
 
         Returns:
-            list[EdgeIndex]: the edge index list that get from the graph.
+            Iterator[EdgeIndex, Data]: the edge separated by the edge index and the edge data.
         """
-        edge_list = self.graph.edges.items()
-        return [edge_tuple[0] for edge_tuple in filter(lambda x: self._compare_edge(x[1], kwargs), edge_list)]
+        for edge in filter(lambda x: self._compare_edge(x[3], kwargs), self.graph.edges(data=True, keys=True)):
+            yield (edge[0], edge[1], edge[2]), edge[3]
 
-    def filter_nodes(self, **kwargs) -> list[str]:
+    def filter_nodes(self, **kwargs) -> Iterator[tuple[str, dict]]:
         """
         filter the nodes in the graph by the node property dict.
 
@@ -393,10 +394,10 @@ class GraphManager:
             **kwargs: the node property dict used to filter the nodes.
 
         Returns:
-            list[str]: the node label list that get from the graph.
+            Iterator[str, Data]: the node separated by the node label and the node data.
         """
-        node_list = self.graph.nodes.items()
-        return [node_tuple[0] for node_tuple in filter(lambda x: self._compare_node(x[1], kwargs), node_list)]
+        for node in filter(lambda x: self._compare_node(x[1], kwargs), self.graph.nodes(data=True)):
+            yield node[0], node[1]
 
     def modify_node_attribute(self, node_label: str, new_attribute: str, new_value: str):
         """
@@ -414,8 +415,7 @@ class GraphManager:
             self.graph.nodes[node_label] = target_node
             return self
         else:
-            print(f"Node with label '{node_label}' not found in the graph.")
-            raise (Exception(f"Node with label '{node_label}'"))
+            raise Exception(f"Node with label '{node_label}' not found in the graph.")
 
     def save(self, file_path: str, stringizer=None):
         """save the graph to the file."""

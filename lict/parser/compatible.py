@@ -21,7 +21,7 @@ class BaseCompatiblityParser(BaseParser):
 
     arg_table = {
         "--ignore-unk": {"action": "store_true", "help": "Ignore unknown licenses", "default": False},
-        "--output": {"type": str, "help": "The output path of the graph", "default": "./output.gml"},
+        "--out-gml": {"type": str, "help": "The output path of the graph", "default": ""},
     }
 
     def __init__(self, args: argparse.Namespace, config: Config):
@@ -41,8 +41,10 @@ class BaseCompatiblityParser(BaseParser):
             children = graph.successors(node)
             yield node, parents, children
 
-    def check_compatiblity(self, license_a: str, license_b: str, scope_a: Scope, scope_b: Scope):
+    def check_compatiblity(self, license_a: str, license_b: str, scope_a: Scope, scope_b: Scope, ignore_unk=False):
         compatible_results = (CompatibleType.CONDITIONAL_COMPATIBLE, CompatibleType.UNCONDITIONAL_COMPATIBLE)
+        if ignore_unk:
+            compatible_results += (CompatibleType.UNKNOWN,)
 
         license_a2b = self.checker.check_compatibility(license_a, license_b, scope=scope_a)
         license_b2a = self.checker.check_compatibility(license_b, license_a, scope=scope_b)
@@ -108,7 +110,21 @@ class BaseCompatiblityParser(BaseParser):
                 scope_a = Scope({conds_a: set()}) if conds_a else conds_a
                 scope_b = Scope({conds_b: set()}) if conds_b else conds_b
 
-                result = self.check_compatiblity(spdx_a, spdx_b, scope_a, scope_b)
+                spdx_a_list = (
+                    [spdx_a + "-with-" + exception for exception in license_a["exceptions"]]
+                    if license_a["exceptions"]
+                    else [spdx_a]
+                )
+                spdx_b_list = (
+                    [spdx_b + "-with-" + exception for exception in license_b["exceptions"]]
+                    if license_b["exceptions"]
+                    else [spdx_b]
+                )
+
+                for spdx_a, spdx_b in itertools.product(spdx_a_list, spdx_b_list):
+                    result = self.check_compatiblity(spdx_a, spdx_b, scope_a, scope_b, ignore_unk)
+                    if result != CompatibleType.INCOMPATIBLE:
+                        break
 
                 if result == CompatibleType.INCOMPATIBLE:
                     conflict_flag = True
@@ -123,7 +139,7 @@ class BaseCompatiblityParser(BaseParser):
 
     def parse(self, project_path: str, context: GraphManager = None) -> GraphManager:
         ignore_unk = getattr(self.args, "ignore_unk", False)
-        output_path = getattr(self.args, "output", "./output.gml")
+        out_gml = getattr(self.args, "out_gml", "")
 
         for sub in track(nx.weakly_connected_components(context.graph), "Parsing compatibility..."):
             for current_node, parents, children in self.generate_processing_sequence(
@@ -216,5 +232,6 @@ class BaseCompatiblityParser(BaseParser):
                         else:
                             context.nodes[current_node]["outbound_license"] = outbound_from_a
 
-        # TODO: del after tested
-        context.save(output_path)
+        if out_gml:
+            context.save(out_gml)
+        return context

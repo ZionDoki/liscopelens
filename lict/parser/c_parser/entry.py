@@ -1,6 +1,8 @@
 from .build_gn_parser_wasted import GnParser
 
+from lict.parser.echo import EchoPaser
 from lict.parser.scancode import ScancodeParser
+from lict.parser.exception import BaseExceptionParser
 from lict.parser.base import BaseParser, BaseParserEntry
 from lict.parser.compatible import BaseCompatiblityParser
 
@@ -9,7 +11,9 @@ class CParserEntry(BaseParserEntry):
     parsers: tuple[BaseParser] = (
         GnParser,
         ScancodeParser,
+        BaseExceptionParser,
         BaseCompatiblityParser,
+        EchoPaser,
     )
 
     entry_name: str = "cParser"

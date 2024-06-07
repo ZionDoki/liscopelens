@@ -145,30 +145,23 @@ class TestParser(unittest.TestCase):
         from lict.parser.compatible import BaseCompatiblityParser
         from lict.parser.scancode import ScancodeParser
 
-        # from lic_compatible_tool.parser.scancode_parser.scancode_parser import ScancodeParser
-        # license_graph = ScancodeParser().parse("test", GraphManager(), argparse.Namespace(scancode_file="license.xml"))
-
-        # generate_knowledge_graph(reinfer=True)
-
-        # with open("oh_licenses.json", "r") as f:
-        #     file2licenses = json.load(f)
-
-        # if not os.path.exists("gn_licenses.gml"):
-        #     raise FileNotFoundError("Test file gn.gml not found, you should run gn parser first")
-
-        # context = GraphManager().load_from_disk("gn_licenses.gml")
-        # nodes = context.filter_nodes(type="code")
-
-        # count = 0
-        # for node in nodes:
-        #     ret = file2licenses.get(node.replace("//", "OH/"), None)
-        #     if ret:
-        #         context.query_node_by_label(node)["licenses"] = str(DualLicenses.from_list(ret))
-
-        # BaseCompatiblityParser(None).parse("test", context)
-
         ScancodeParser(argparse.Namespace(scancode_file="../lict_exp/test.json")).parse("test", GraphManager())
 
+
+class TempTest(unittest.TestCase):
+
+    def test(self):
+        exceptions = load_exceptions()
+        licenses = load_licenses()
+
+        print((*licenses.values(), *exceptions.values()))
+
+        for lic in licenses:
+            for exp in exceptions:
+                print(licenses[lic])
+                print(licenses[lic].cover_from(exceptions[exp]))
+                break
+            break
 
 if __name__ == "__main__":
     unittest.main()

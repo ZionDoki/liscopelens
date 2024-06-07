@@ -22,13 +22,16 @@ class Checker:
         if Checker._initialized:
             return
 
-        generate_knowledge_graph()
-
-        destination = get_resource_path()
-        self.properties_graph = GraphManager(destination.joinpath(Settings.LICENSE_PROPERTY_GRAPH))
-        self.compatible_graph = GraphManager(destination.joinpath(Settings.LICENSE_COMPATIBLE_GRAPH))
-
+        self.infer = generate_knowledge_graph()
         Checker._initialized = True
+
+    @property
+    def properties_graph(self):
+        return self.infer.properties_graph
+
+    @property
+    def compatible_graph(self):
+        return self.infer.compatible_graph
 
     def is_license_exist(self, license_name: str) -> bool:
         """

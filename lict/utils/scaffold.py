@@ -7,43 +7,50 @@ from lict.constants import Settings
 from typing import Generator
 
 
-def load_resource(filename: str, package_name: str = None) -> str:
+def load_resource(filename: str, package_name: str = None, source_name: str = None) -> str:
     """
     Load a file from the resources of a package
 
     Args:
         filename (str): the file name
         package_name (str): the package name
+        source_name (str): the source name
 
     Returns:
         str: the content of the file
     """
+    if source_name is None:
+        source_name = Settings.RESOURCE_NAME
+
     if package_name is None:
-        package_name = f"{Settings.PACAKAGE_NAME}.{Settings.RESOURCE_NAME}"
+        package_name = f"{Settings.PACAKAGE_NAME}.{source_name}"
 
     resources = importlib.resources.files(package_name)
     with resources.joinpath(filename).open("r", encoding="utf8") as f:
         return f.read()
 
 
-def is_file_in_resources(filename: str, package_name: str = None) -> bool:
+def is_file_in_resources(filename: str, package_name: str = None, resource_name: str = None) -> bool:
     """
     Check if a file is in the resources of a package
 
     Args:
         filename (str): the file name
         package_name (str): the package name
+        source_name (str): the source name
 
     Returns:
         bool: whether the file is in the resources of the package
     """
+    if resource_name is None:
+        resource_name = Settings.RESOURCE_NAME
+
     if package_name is None:
-        package_name = f"{Settings.PACAKAGE_NAME}.{Settings.RESOURCE_NAME}"
+        package_name = f"{Settings.PACAKAGE_NAME}.{resource_name}"
 
     try:
         return importlib.resources.is_resource(package_name, filename)
     except ModuleNotFoundError:
-
         return False
 
 
@@ -75,7 +82,7 @@ def write_to_resources(filename: str, content: str | bytes, package_name: str = 
         shutil.rmtree(temp_dir)
 
 
-def get_resource_path(package_name: str = None, resource_name: str = None) -> str:
+def get_resource_path(file_name: str = None, package_name: str = None, resource_name: str = None) -> str:
     """
     Get the path to the resources of a package
 
@@ -91,6 +98,9 @@ def get_resource_path(package_name: str = None, resource_name: str = None) -> st
     resource_name = resource_name if resource_name else Settings.RESOURCE_NAME
 
     resource_path = f"{package_name}.{resource_name}"
+
+    if file_name:
+        return importlib.resources.files(resource_path).joinpath(file_name)
 
     return importlib.resources.files(resource_path).joinpath("")
 
