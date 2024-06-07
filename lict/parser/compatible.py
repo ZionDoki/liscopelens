@@ -53,7 +53,7 @@ class BaseCompatiblityParser(BaseParser):
 
             if license_a2b != license_b2a and CompatibleType.UNCONDITIONAL_COMPATIBLE in (license_a2b, license_b2a):
                 Warning.warn(f"{license_a} -{license_a2b}-> {license_b}, {license_b} -{license_b2a}-> {license_a}.")
-            return license_a2b
+            return license_a2b if license_a2b in compatible_results else license_b2a
 
         return CompatibleType.INCOMPATIBLE
 
@@ -115,6 +115,7 @@ class BaseCompatiblityParser(BaseParser):
                     if license_a["exceptions"]
                     else [spdx_a]
                 )
+
                 spdx_b_list = (
                     [spdx_b + "-with-" + exception for exception in license_b["exceptions"]]
                     if license_b["exceptions"]
