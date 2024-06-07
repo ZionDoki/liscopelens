@@ -85,7 +85,7 @@ class Checker:
             if edge["compatibility"] == CompatibleType.CONDITIONAL_COMPATIBLE:
 
                 if not scope:
-                    return CompatibleType.INCOMPATIBLE
+                    scope = Scope()
 
                 compatible_scope = Scope.from_str(edge["scope"])
 

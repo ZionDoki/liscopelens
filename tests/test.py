@@ -154,14 +154,20 @@ class TempTest(unittest.TestCase):
         exceptions = load_exceptions()
         licenses = load_licenses()
 
-        print((*licenses.values(), *exceptions.values()))
+        graph = GraphManager("lict/resources/compatible_graph.gml")
+        edge = graph.query_edge_by_label("GPL-2.0-only", "GPL-3.0-or-later-with-Bison-exception-2.2")
+        print(edge)
+        print(graph.get_edge_data(edge[0]))
+        edge = graph.query_edge_by_label("GPL-3.0-or-later-with-Bison-exception-2.2", "GPL-2.0-only")
+        print(edge)
+        edge = graph.get_edge_data(edge[0])
+        scope = Scope.from_str(edge["scope"])
+        scope["UNIVERSAL"] = ["a", "b"]
+        print(scope)
+        print(Scope({"a": set()}))
+        print(Scope({"COMPILE": set()}) in scope)
 
-        for lic in licenses:
-            for exp in exceptions:
-                print(licenses[lic])
-                print(licenses[lic].cover_from(exceptions[exp]))
-                break
-            break
+
 
 if __name__ == "__main__":
     unittest.main()
