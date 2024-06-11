@@ -11,10 +11,6 @@ from .parser import PARSER_ENTRIES
 
 def cli():
     parser = argparse.ArgumentParser(description="部件兼容性分析工具")
-    parser.add_argument("--output", type=str, default="", help="输出文件路径")
-    parser.add_argument("--log-level", type=str, default="info", help="日志级别")
-    parser.add_argument("--beauty", action="store_true", default=False, help="美化输出")
-    parser.add_argument("--reinfer", action="store_true", default=False, help="强制更新知识库")
     parser.add_argument("-c", "--config", type=str, default="", help="配置文件路径")
 
     subparsers = parser.add_subparsers(dest="command", required=True)

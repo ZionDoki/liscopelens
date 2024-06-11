@@ -222,8 +222,7 @@ class ProcessSbom(object):
 class SBOMParser(BaseParser):
     conflicts = []
     arg_table = {
-        "--sbom": {"type": str, "help": "this is a test arg", "group": "a"},
-        "--sbom_file": {"type": str, "help": "this is a test arg", "group": "a"},
+        "--sbom_file": {"type": str, "help": "sbom_file_path", "group": "a"},
     }
 
     def parse(self, project_path: str, context: GraphManager):
