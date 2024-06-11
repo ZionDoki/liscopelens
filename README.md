@@ -1,6 +1,20 @@
 # compliance_license_compatibility
 
-#### 介绍
+
+1. [compliance\_license\_compatibility](#compliance_license_compatibility)
+   1. [介绍](#介绍)
+      1. [目录结构](#目录结构)
+   2. [安装教程](#安装教程)
+   3. [使用说明](#使用说明)
+      1. [基于sbom文件分析兼容性](#基于sbom文件分析兼容性)
+         1. [参数列表](#参数列表)
+      2. [分析代码仓库的兼容性(请确保存在gn工具或者gn解析文件)](#分析代码仓库的兼容性请确保存在gn工具或者gn解析文件)
+         1. [参数列表](#参数列表-1)
+   4. [已知问题](#已知问题)
+   5. [参与贡献](#参与贡献)
+
+
+## 介绍
 
 开源许可证兼容性分析工具，基于结构化的许可证信息和具体场景的依赖行为与构建设置，对目标中引入的开源许可证进行兼容性分析。
 
@@ -8,7 +22,7 @@
 
 **注意：本项目当前仍处于早期版本，相关结果的准确性未进行验证，且迭代过程中各模块接口将会发生较大变化。**
 
-#### 目录结构
+### 目录结构
 ```
 |-compliance_license_compatibility
 |  |─doc #设计文档
@@ -46,13 +60,13 @@
 |  |─tests
 ```
 
-### 1.安装教程
+## 安装教程
 
 0. 确保已经安装 `python 3.11^`
 1. clone 仓库
 2. 进入仓库根目录 `pip install .`
 
-### 2.使用说明
+## 使用说明
 
 确保工具安装后，终端输入指令 `lict --help`
 
@@ -73,8 +87,10 @@ options:
                         配置文件路径
 ```
 
-#### 2.1基于sbom文件分析兼容性
+### 基于sbom文件分析兼容性
+
 目前仅支持OH SBOM文件，文件应符合如下格式
+
 ```json
 {
     "spdxId": "0eedfd2b-5a20-4cad-adf8-371197d0cd27",
@@ -135,7 +151,9 @@ options:
 }
 
 ```
+
 查看帮助 `lict sbom -h`
+
 ```shell
 usage: lict sbom [-h]  [--sbom_file SBOM_FILE]
 
@@ -145,18 +163,21 @@ options:
 ```
 
 运行shell命令进行兼容性检查
+
 ```shell
 lict sbom --sbom_file SBOMPATH
 ```
-###### 参数列表
-| 参数          | 类型   | 说明       | 是否必须 |
-|-------------|------|----------|------|
-| --c         | str  | 配置文件路径   | 否    |
-| sbom | bool | 指明使用sbom | 是    |
-| --sbom_file | str  | sbom文件路径 | 是    |
+
+#### 参数列表
+
+| 参数        | 类型 | 说明         | 是否必须 |
+| ----------- | ---- | ------------ | -------- |
+| --c         | str  | 配置文件路径 | 否       |
+| sbom        | bool | 指明使用sbom | 是       |
+| --sbom_file | str  | sbom文件路径 | 是       |
 
 
-#### 2.2分析代码仓库的兼容性(请确保存在gn工具或者gn解析文件)
+### 分析代码仓库的兼容性(请确保存在gn工具或者gn解析文件)
 查看帮助 `lict cpp -h`
 ```shell
 usage: lict cpp [-h] (--gn_tool GN_TOOL | --gn_file GN_FILE)
@@ -182,20 +203,22 @@ options:
 ```shell
 lict cpp --gn_tool GN_TOOL --scancode-file SCANCODE_FILE --echo 
 ```
-###### 参数列表
-| 参数                | 类型  | 说明                                                                         | 是否必须 |
-|---------------------|-------|------------------------------------------------------------------------------|----------|
-| cpp           | bool   | 指明检测C/C++代码仓库                                                       | 是       |
-| --gn_tool           | str   | GN 工具的可执行文件路径                                                       | 是       |
-| --gn_file           | str   | GN 依赖图输出文件路径                                                         | 是       |
-| --scancode-file     | str   | Scancode 输出的 JSON 格式文件路径                                             | 是       |
-| --scancode-dir      | str   | 包含 JSON 文件的目录路径                                                      | 是       |
-| --rm-ref-lang       | bool  | 自动移除 Scancode 引用前缀和语言后缀                                           | 否       |
-| --save-kg           | bool  | 在解析后保存新的知识图谱                                                      | 否       |
-| --ignore-unk        | bool  | 忽略未知的许可证                                                              | 否       |
-| --out-gml           | str   | 图谱的输出路径                                                                | 否       |
-| --echo              | bool  | 回显兼容性检查的最终结果                                                      | 否       |
-| --out-echo          | str   | 回显结果的输出路径                                                            | 否       |
+
+#### 参数列表
+
+| 参数            | 类型 | 说明                                 | 是否必须 |
+| --------------- | ---- | ------------------------------------ | -------- |
+| cpp             | bool | 指明检测C/C++代码仓库                | 是       |
+| --gn_tool       | str  | GN 工具的可执行文件路径              | 是       |
+| --gn_file       | str  | GN 依赖图输出文件路径                | 是       |
+| --scancode-file | str  | Scancode 输出的 JSON 格式文件路径    | 是       |
+| --scancode-dir  | str  | 包含 JSON 文件的目录路径             | 是       |
+| --rm-ref-lang   | bool | 自动移除 Scancode 引用前缀和语言后缀 | 否       |
+| --save-kg       | bool | 在解析后保存新的知识图谱             | 否       |
+| --ignore-unk    | bool | 忽略未知的许可证                     | 否       |
+| --out-gml       | str  | 图谱的输出路径                       | 否       |
+| --echo          | bool | 回显兼容性检查的最终结果             | 否       |
+| --out-echo      | str  | 回显结果的输出路径                   | 否       |
 
 gn依赖图格式如下
 ```json
@@ -251,7 +274,7 @@ gn依赖图格式如下
 
 ```
 
-#### 已知问题
+## 已知问题
 
 1. `poetry install` 无响应或者报错提示包括 `Failed to unlock the collection`.
 
@@ -259,7 +282,7 @@ gn依赖图格式如下
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 ```
 
-#### 参与贡献
+## 参与贡献
 
 参见[设计文档](doc/设计文档.md#开发手册)
 
