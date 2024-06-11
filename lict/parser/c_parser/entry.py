@@ -1,4 +1,4 @@
-from .build_gn_parser_wasted import GnParser
+from .build_gn_parser import GnParser
 
 from lict.parser.echo import EchoPaser
 from lict.parser.scancode import ScancodeParser

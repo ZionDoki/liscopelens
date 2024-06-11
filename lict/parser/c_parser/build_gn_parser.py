@@ -6,9 +6,6 @@ from lict.utils.graph import GraphManager
 from rich.progress import track
 
 
-# 从gn文件中主要有两个信息，一个信息是一个组件中的哪些文件被打包在一起，另一个信息
-# 是该仓库中指定的组件依赖哪些其他组件，目前打算返回一个字典，该字典内包含两个键值，
-# 第一个键值表示依赖的组件列表，第二个键值表示哪些文件在一起
 class GnParser(BaseParser):
     gn_dict = {"deps": {}}
     visted = set()
