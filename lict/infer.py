@@ -13,7 +13,6 @@ from lict.utils.structure import (
     LicenseFeat,
     load_schemas,
     load_licenses,
-    load_exceptions,
     ActionFeatOperator,
 )
 from lict.utils.graph import Edge, GraphManager, Triple, Vertex
@@ -53,7 +52,6 @@ def generate_knowledge_graph(reinfer: bool = False) -> "CompatibleInfer":
         for license_name, license in all_licenses.items():
             infer.check_license_property(license)
 
-        infer.properties_graph.viz()
         infer.save()
 
     infer = CompatibleInfer(schemas=schemas)
@@ -200,10 +198,16 @@ class ExceptRelicenseRule(CompatibleRule):
         relicense_feat = license_a.special.get("relicense")
         if relicense_feat := license_a.special.get("relicense"):
             if len(relicense_feat.target) != 0:
-                self.add_callback(lambda x: self.callback(license_a, license_b, x))
-        return ComplianceRequirementRule, None
+                self.add_callback(lambda licenses, graph: self.callback(licenses, graph, license_a, license_b))
+        return OrLaterRelicenseRule, None
 
-    def callback(self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager) -> None:
+    def callback(
+        self,
+        licenses: Dict[str, LicenseFeat],
+        graph: GraphManager,
+        license_a: LicenseFeat,
+        license_b: LicenseFeat,
+    ) -> None:
 
         is_compatible = self.has_edge(
             license_a, license_b, graph, compatibility=CompatibleType.UNCONDITIONAL_COMPATIBLE
@@ -243,13 +247,96 @@ class ExceptRelicenseRule(CompatibleRule):
                 for edge_index in condition_edges:
                     origin_edge = graph.get_edge_data(edge_index)
                     origin_scope = Scope(json.loads(origin_edge["scope"]))
+
+                    new_compatible_scope = origin_scope & license_a.special["relicense"]
+                    if not new_compatible_scope:
+                        continue
+
                     edge = self.new_edge(
                         license_a,
                         license_b,
                         compatibility=CompatibleType.CONDITIONAL_COMPATIBLE,
-                        scope=origin_scope & license_a.special["relicense"],
+                        scope=new_compatible_scope,
                     )
                     graph.add_edge(edge)
+
+
+class OrLaterRelicenseRule(CompatibleRule):
+    """
+    Check if there is a or-later relicense in the license_a, if so, add a callback to check relicense target.
+    If the target is compatible with license_b, then license_a is conditional compatible with license_b.
+    """
+
+    def __call__(
+        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Edge = None
+    ) -> Tuple[type[CompatibleRule] | Edge]:
+        if "or-later" in license_a.spdx_id:
+            self.add_callback(lambda licenses, graph: self.callback(licenses, graph, license_a, license_b))
+        return ComplianceRequirementRule, None
+
+    def get_normalized_version(self, spdx_id: str) -> str:
+        return normalize_version(extract_version(spdx_id))
+
+    def callback(
+        self, licenses: Dict[str, LicenseFeat], graph: GraphManager, license_a: LicenseFeat, license_b: LicenseFeat
+    ) -> None:
+        current_version = self.get_normalized_version(license_a.spdx_id)
+        later_licenses = filter(
+            lambda x: self.get_normalized_version(x) > current_version,
+            find_all_versions(license_a.spdx_id, licenses.keys()),
+        )
+
+        is_compatible = self.has_edge(
+            license_a, license_b, graph, compatibility=CompatibleType.UNCONDITIONAL_COMPATIBLE
+        )
+
+        if is_compatible:
+            return
+
+        for tgt in later_licenses:
+            if "or-later" in tgt:
+                continue
+
+            is_compatible = graph.query_edge_by_label(
+                tgt, license_b.spdx_id, compatibility=CompatibleType.UNCONDITIONAL_COMPATIBLE
+            )
+
+            if bool(is_compatible):
+                origin_edges = graph.query_edge_by_label(
+                    license_a.spdx_id, license_b.spdx_id, compatibility=CompatibleType.INCOMPATIBLE
+                )
+
+                for edge_index in origin_edges:
+                    graph.remove_edge(edge_index)
+
+                edge = self.new_edge(
+                    license_a,
+                    license_b,
+                    compatibility=CompatibleType.CONDITIONAL_COMPATIBLE,
+                    scope=str(Scope({tgt: set()})),
+                )
+                graph.add_edge(edge)
+                return
+
+            condition_edges = graph.query_edge_by_label(
+                tgt, license_b.spdx_id, compatibility=CompatibleType.CONDITIONAL_COMPATIBLE
+            )
+
+            for edge_index in condition_edges:
+                origin_edge = graph.get_edge_data(edge_index)
+                origin_scope = Scope(json.loads(origin_edge["scope"]))
+
+                new_compatible_scope = origin_scope & Scope({tgt: set()})
+                if not new_compatible_scope:
+                    continue
+
+                edge = self.new_edge(
+                    license_a,
+                    license_b,
+                    compatibility=CompatibleType.CONDITIONAL_COMPATIBLE,
+                    scope=str(new_compatible_scope),
+                )
+                graph.add_edge(edge)
 
 
 class ComplianceRequirementRule(CompatibleRule):
@@ -482,9 +569,12 @@ class CompatibleInfer:
 
         while len(self.callback_queque) > 0:
             callback = self.callback_queque.pop(0)
-            callback(self.compatible_graph)
+            callback(licenses, self.compatible_graph)
 
     def infer_parir_compatibility(self, license_a: LicenseFeat, license_b: LicenseFeat):
+        """
+        !deprecated
+        """
         if license_a == license_b:
             return
 
