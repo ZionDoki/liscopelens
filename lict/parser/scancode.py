@@ -41,7 +41,8 @@ class ScancodeParser(BaseParser):
         self.spdx_parser = SPDXParser()
 
     def add_license(self, context: GraphManager, file_path: str, spdx_results: DualLicense):
-        parent_label = "//" + file_path
+        parent_label = "//" + file_path.replace("\\", "/")
+
         context_node = context.nodes.get(parent_label, None)
 
         if not context_node:
