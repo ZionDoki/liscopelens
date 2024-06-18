@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import tempfile
 import importlib.resources
@@ -186,3 +187,48 @@ def combined_generator(origin_generator: Generator, *args: list[Generator]):
     for arg in args:
         for item in arg:
             yield item
+
+
+def extract_version(spdx_id: str) -> str | None:
+    """
+    Extract the version number from a license ID.
+
+    Args:
+        spdx_id (str): The license ID.
+
+    Returns:
+        str | None: The version number
+    """
+    version_pattern = r"(\d+\.\d+(\.\d+)?)"
+    match = re.search(version_pattern, spdx_id)
+    if match:
+        return match.group(1)
+    return None
+
+
+def normalize_version(version: str) -> list[int]:
+    """
+    Normalize the version number. Let version str could be compared.
+
+    Args:
+        version (str): The version number.
+
+    Returns:
+        list[int]: The normalized version number.
+    """
+    return [int(x) for x in re.sub(r"(\.0+)*$", "", version).split(".")]
+
+
+def find_all_versions(spdx_idx: str, licenses: list[str]) -> list[str]:
+    """
+    Find all versions of a license.
+
+    Args:
+        spdx_idx (str): The SPDX ID of the license.
+        licenses (list[str]): The list of licenses
+
+    Returns:
+        list[str]: The list of versions of the license.
+    """
+    prefix = spdx_idx.split("-")[0]
+    return [license for license in licenses if license.startswith(prefix)]

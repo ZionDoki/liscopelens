@@ -99,8 +99,26 @@ class TestLicenseTools(unittest.TestCase):
             "Check Universal intersect failed",
         )
 
-    def test_infer(self):
+    def test_checker(self):
+        checker = Checker()
 
+        generate_knowledge_graph(reinfer=True)
+
+        self.assertFalse(checker.check_license_exist("MITR"), "MITR should not exist in the license graph")
+
+        self.assertTrue(checker.check_license_exist("MIT"), "MIT should exist in the license graph")
+
+        self.assertAlmostEqual(
+            checker.check_compatibility("LGPL-2.1-only", "Apache-2.0", scope=Scope({"dynamic_linking": set()})),
+            CompatibleType.CONDITIONAL_COMPATIBLE,
+            "LGPL-2.1-only and Apache-2.0 should be CONDITIONAL_COMPATIBLE",
+        )
+
+
+class TestInfer(unittest.TestCase):
+
+    def test_infer(self):
+        generate_knowledge_graph(reinfer=True)
         schemas = load_schemas()
         licenses = load_licenses()
         infer = CompatibleInfer(schemas=schemas)
@@ -118,23 +136,6 @@ class TestLicenseTools(unittest.TestCase):
                     edge["compatibility"],
                     f"{lic} and {lic2} should be {CompatibleType(result[lic][lic2]).name}, but {CompatibleType(edge['compatibility']).name}",
                 )
-
-        generate_knowledge_graph(reinfer=True)
-
-    def test_checker(self):
-        checker = Checker()
-
-        generate_knowledge_graph(reinfer=True)
-
-        self.assertFalse(checker.check_license_exist("MITR"), "MITR should not exist in the license graph")
-
-        self.assertTrue(checker.check_license_exist("MIT"), "MIT should exist in the license graph")
-
-        self.assertAlmostEqual(
-            checker.check_compatibility("LGPL-2.1-only", "Apache-2.0", scope=Scope({"dynamic_linking": set()})),
-            CompatibleType.CONDITIONAL_COMPATIBLE,
-            "LGPL-2.1-only and Apache-2.0 should be CONDITIONAL_COMPATIBLE",
-        )
 
 
 class TestParser(unittest.TestCase):
@@ -166,7 +167,6 @@ class TempTest(unittest.TestCase):
         print(scope)
         print(Scope({"a": set()}))
         print(Scope({"COMPILE": set()}) in scope)
-
 
 
 if __name__ == "__main__":

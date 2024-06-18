@@ -1,0 +1,10 @@
+["GPL-2.0-only"]
+"GPL-3.0-only" = 3
+"Apache-2.0" = 3
+
+["Apache-2.0"]
+"GPL-2.0-or-later" = 3
+"GPL-2.0-only" = 3
+
+["GPL-2.0-or-later"]
+"Apache-2.0" = 1
