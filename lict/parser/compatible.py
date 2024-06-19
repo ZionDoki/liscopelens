@@ -90,7 +90,7 @@ class BaseCompatiblityParser(BaseParser):
         other_compatbile = DualLicense()
 
         conflict_flag = False
-
+        conflict = []
         for base_group, other_group in itertools.product(base_dl, other_dl):
 
             conflict_flag = False
@@ -128,6 +128,7 @@ class BaseCompatiblityParser(BaseParser):
                         break
 
                 if result == CompatibleType.INCOMPATIBLE:
+                    conflict.append((spdx_a, spdx_b))
                     conflict_flag = True
                     break
 
@@ -136,7 +137,7 @@ class BaseCompatiblityParser(BaseParser):
                 base_compatible.add(base_group)
                 other_compatbile.add(other_group)
 
-        return base_compatible, other_compatbile, conflict_flag
+        return base_compatible, other_compatbile, conflict_flag, conflict
 
     def parse(self, project_path: str, context: GraphManager = None) -> GraphManager:
         ignore_unk = getattr(self.args, "ignore_unk", False)
@@ -155,11 +156,11 @@ class BaseCompatiblityParser(BaseParser):
                     # * check the current node first that has licenses
                     if node_a == current_node and (license_groups := context.nodes[current_node].get("licenses")):
 
-                        results, _, conflict_flag = self.filter_dual_pair(license_groups, ignore_unk=ignore_unk)
+                        results, _, conflict_flag, conflict = self.filter_dual_pair(license_groups, ignore_unk=ignore_unk)
 
                         if not results and conflict_flag:
                             edge = self.create_edge(
-                                node_a, node_a, label=CompatibleType.INCOMPATIBLE, type="compatible_result"
+                                node_a, node_a, label=CompatibleType.INCOMPATIBLE, type="compatible_result", conflict=conflict
                             )
                             context.add_edge(edge)
                         else:
@@ -190,7 +191,7 @@ class BaseCompatiblityParser(BaseParser):
                         if context.nodes[node_b].get("license_isolation", False):
                             continue
 
-                        compatible_a, compatible_b, conflict_flag = self.filter_dual_pair(
+                        compatible_a, compatible_b, conflict_flag, conflict = self.filter_dual_pair(
                             filtered_a, dual_b, ignore_unk=ignore_unk
                         )
 
@@ -206,7 +207,7 @@ class BaseCompatiblityParser(BaseParser):
 
                             for node in conflict_stack:
                                 edge = self.create_edge(
-                                    node_a, node, compatible=incompatible_type, type="compatible_result"
+                                    node_a, node, compatible=incompatible_type, type="compatible_result", conflict=conflict
                                 )
                                 context.add_edge(edge)
                             # * terminate the loop

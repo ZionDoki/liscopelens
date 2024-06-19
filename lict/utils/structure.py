@@ -420,17 +420,23 @@ class DualUnit(dict):
         spdx_id: str, SPDX ID of the license
         condition: str, condition of the license
         exceptions: list[str], list of exceptions
+        filename: str, where license from
 
     Magic Methods:
         __hash__() -> int: hash the object
     """
 
-    def __init__(self, spdx_id: str, condition="", exceptions=[]):
-        super().__init__(spdx_id=spdx_id, condition=condition, exceptions=exceptions)
+    def __init__(self, spdx_id: str, condition=None, exceptions=[], filename=None):
+        super().__init__(spdx_id=spdx_id, condition=condition, exceptions=exceptions,filename=filename)
 
     def __hash__(self):
         return hash((self["spdx_id"], self.get("condition", ""), tuple(self.get("exceptions", []))))
 
+    def __eq__(self, other):
+        if not isinstance(other, DualUnit):
+            return False
+
+        return self.__hash__() == other.__hash__()
 
 class DualLicense(set):
     """
@@ -470,7 +476,7 @@ class DualLicense(set):
             new_group = set()
             for unit in group:
 
-                new_group.add(DualUnit(unit["spdx_id"], conditon, unit["exceptions"]))
+                new_group.add(DualUnit(unit["spdx_id"], conditon, unit["exceptions"], unit["filename"]))
                 if not unit["condition"] or unit["condition"] == conditon:
                     new_group.add(unit)
                 else:
@@ -490,10 +496,10 @@ class DualLicense(set):
             for license in group:
 
                 if license["condition"] in config.license_spread.spread_conditions:
-                    new_group.add(DualUnit(license["spdx_id"], None, license["exceptions"]))
+                    new_group.add(DualUnit(license["spdx_id"], None, license["exceptions"], license["filename"]))
 
                 elif default_spread and license["condition"] not in config.license_spread.spread_conditions:
-                    new_group.add(DualUnit(license["spdx_id"], None, license["exceptions"]))
+                    new_group.add(DualUnit(license["spdx_id"], None, license["exceptions"], license["filename"]))
 
             new.add(tuple(new_group))
         return new
@@ -501,8 +507,9 @@ class DualLicense(set):
 
 class SPDXParser:
 
-    def __call__(self, expression, expand=False, proprocessor: callable = None):
+    def __call__(self, expression, filepath=None, expand=False, proprocessor: callable = None):
         self.expression = expression
+        self.filepath = filepath
         self.tokens = []
         self.current = 0
         self.expression = self.parse(proprocessor)
@@ -579,8 +586,8 @@ class SPDXParser:
                 current_results = self.expand_expression(expression[idx])
                 idx += 1
             elif isinstance(expression[idx], DualUnit):
+                expression[idx]['filename'] = self.filepath
                 current_results = DualLicense.from_list([[expression[idx]]])
-
                 idx += 1
 
             if previous_op == "AND":
