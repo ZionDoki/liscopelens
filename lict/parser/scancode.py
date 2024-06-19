@@ -85,6 +85,7 @@ class ScancodeParser(BaseParser):
                         file_path = os.path.relpath(match["from_file"], match["from_file"].split(os.sep)[0])
                     spdx_results = self.spdx_parser(
                         match["license_expression_spdx"],
+                        file_path,
                         expand=True,
                         proprocessor=self.remove_ref_lang if self.args.rm_ref_lang else None,
                     )
@@ -97,7 +98,7 @@ class ScancodeParser(BaseParser):
                 else:
                     file_path = os.path.relpath(file["path"], file["path"].split(os.sep)[0])
                 if file["detected_license_expression_spdx"]:
-                    spdx_results = self.spdx_parser(file["detected_license_expression_spdx"], expand=True)
+                    spdx_results = self.spdx_parser(file["detected_license_expression_spdx"], file_path, expand=True)
 
                     self.add_license(context, file_path, spdx_results)
 

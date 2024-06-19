@@ -43,6 +43,7 @@ class EchoPaser(BaseParser):
             results.append(
                 {
                     "parents": set(context.predecessors(source)) & set(context.predecessors(target)),
+                    "conflicts": edge_data["conflict"],
                     source: context.nodes[source],
                     target: context.nodes[target],
                     "results": "INCOMPATIBLE",
