@@ -1,4 +1,4 @@
-black_list = ["GPL-3.0-only"]
+blacklist = ["GPL-3.0-only"]
 license_isolations = ["EXECUTABLE"]
 
 [license_spread]

@@ -3,11 +3,13 @@
 # Date: 2024/06/06
 # Contact: liuza20@lzu.edu.cn
 
+import copy
 from .base import BaseParser
 from argparse import Namespace
 from lict.checker import Checker
-from lict.utils.graph import GraphManager
+from lict.utils.graph import GraphManager, Edge
 from lict.utils.structure import Config, load_licenses, load_exceptions
+from lict.utils import find_all_versions, normalize_version, extract_version
 
 
 class BaseExceptionParser(BaseParser):
@@ -25,6 +27,7 @@ class BaseExceptionParser(BaseParser):
 
     def parse(self, project_path: str, context: GraphManager = None) -> GraphManager:
         save_kg = getattr(self.args, "save_kg", False)
+        blacklist = getattr(self.config, "blacklist", [])
 
         visited_licenses, new_for_infer = set(), {}
 
@@ -58,5 +61,22 @@ class BaseExceptionParser(BaseParser):
         self.checker.infer.check_compatibility({**self.all_licenes, **new_for_infer})
         if save_kg:
             self.checker.infer.save()
+
+        print("Remove or-later compatible edges involving blacklist.")
+        for spdx_id in blacklist:
+            for edge_index, _ in tuple(self.checker.compatible_graph.filter_edges(path=spdx_id)):
+                src_node, dst_node = edge_index[0], edge_index[1]
+
+                if "or-later" in src_node:
+                    src_license, dst_license = src_node.replace("-or-later", "-only"), dst_node
+                else:
+                    src_license, dst_license = src_node, dst_node.replace("-or-later", "-only")
+
+                edges = self.checker.compatible_graph.query_edge_by_label(src_license, dst_license)
+                for edge in edges:
+                    edge_data = self.checker.compatible_graph.get_edge_data(edge)
+                    self.checker.compatible_graph.add_edge(Edge(src_node, dst_node, **copy.deepcopy(edge_data)))
+
+                self.checker.compatible_graph.remove_edge(edge_index)
 
         return context

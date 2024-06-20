@@ -48,7 +48,11 @@ class Checker:
         return self.properties_graph.nodes.get(license_name) is not None
 
     def check_compatibility(
-        self, license_a: str | LicenseFeat, license_b: str | LicenseFeat, scope: Scope = None
+        self,
+        license_a: str | LicenseFeat,
+        license_b: str | LicenseFeat,
+        scope: Scope = None,
+        blacklist: list[str] = None,
     ) -> CompatibleType:
         """
         Check the compatibility between two licenses
@@ -81,6 +85,7 @@ class Checker:
 
         edge_index = self.compatible_graph.query_edge_by_label(license_a_id, license_b_id)
         if edge_index:
+            # TODO: check all edges 
             edge = self.compatible_graph.get_edge_data(edge_index[0])
             if edge["compatibility"] == CompatibleType.CONDITIONAL_COMPATIBLE:
 

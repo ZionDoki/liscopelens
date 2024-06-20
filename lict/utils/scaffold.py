@@ -219,16 +219,19 @@ def normalize_version(version: str) -> list[int]:
     return [int(x) for x in re.sub(r"(\.0+)*$", "", version).split(".")]
 
 
-def find_all_versions(spdx_idx: str, licenses: list[str]) -> list[str]:
+def find_all_versions(spdx_idx: str, licenses: list[str], filter_func: callable = None) -> list[str]:
     """
     Find all versions of a license.
 
     Args:
         spdx_idx (str): The SPDX ID of the license.
-        licenses (list[str]): The list of licenses
+        licenses (list[str]): The list of licenses.
+        filter_func (callable): The filter function.
 
     Returns:
         list[str]: The list of versions of the license.
     """
     prefix = spdx_idx.split("-")[0]
-    return [license for license in licenses if license.startswith(prefix)]
+    return [
+        license for license in licenses if license.split("-")[0] == prefix and (not filter_func or filter_func(license))
+    ]
