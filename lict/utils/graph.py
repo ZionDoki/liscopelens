@@ -3,6 +3,7 @@ import warnings
 
 import networkx as nx
 from typing import Iterator
+from collections import defaultdict
 from matplotlib import pyplot as plt
 
 """
@@ -145,6 +146,26 @@ class GraphManager:
         if self._leaf_nodes == None:
             self._leaf_nodes = [node for node in self.graph.nodes if self.graph.out_degree(node) == 0]
         return self._leaf_nodes
+
+    def deduplicate_and_reorder_edges(self) -> "GraphManager":
+        """
+        Create a new GraphManager with deduplicated and reordered edges.
+        """
+        seen = set()
+        new_keys = defaultdict(int)
+        new_graph = nx.MultiDiGraph()
+
+        for u, v, key, data in self.graph.edges(data=True, keys=True):
+            edge_tuple = (u, v, frozenset(data.items()))
+            if edge_tuple not in seen:
+                seen.add(edge_tuple)
+                new_key = new_keys[(u, v)]
+                new_keys[(u, v)] += 1
+                new_graph.add_edge(u, v, key=new_key, **data)
+
+        new_graph_manager = GraphManager()
+        new_graph_manager.graph = new_graph
+        return new_graph_manager
 
     def dfs(self):
         """depth first search the graph."""
@@ -377,6 +398,13 @@ class GraphManager:
         """
         filter the edges in the graph by the edge property dict.
 
+        Usage:
+            ```python
+            for edge_index, edge_data in graph.filter_edges(type="dependency"):
+                graph.remove_edge(edge_index)
+                ...
+            ```
+
         Args:
             **kwargs: the edge property dict used to filter the edges.
 
@@ -389,6 +417,12 @@ class GraphManager:
     def filter_nodes(self, **kwargs) -> Iterator[tuple[str, dict]]:
         """
         filter the nodes in the graph by the node property dict.
+
+        Usage:
+            ```python
+            for node_index, node_data in graph.filter_nodes(type="package"):
+                print(node_index, node_data)
+            ```
 
         Args:
             **kwargs: the node property dict used to filter the nodes.

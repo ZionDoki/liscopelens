@@ -32,7 +32,7 @@ class Config:
     The Config store which usage conditions that will make a license spread or not.
 
     Properties:
-        black_list: list[str], list of licenses that will be black listed
+        blacklist: list[str], list of licenses that will be black listed
         license_isolations: list[str], list of licenses that will be isolated
         license_spread: LicenseSpread, define the spread conditions
         literal_mapping: dict[str, str], mapping of the usage literals to ScopeElment enum
@@ -43,7 +43,7 @@ class Config:
         from_toml(path: str) -> Config: load Config from a toml file
     """
 
-    black_list: list[str] = field(default_factory=list)
+    blacklist: list[str] = field(default_factory=list)
     license_isolations: list[str] = field(default_factory=list)
     license_spread: LicenseSpread = field(default_factory=LicenseSpread)
     literal_mapping: dict[str, str] = field(default_factory=dict)
@@ -59,7 +59,6 @@ class Config:
 
     @classmethod
     def from_toml(cls, path: str) -> "Config":
-        config = os.path.basename(path).replace(".toml", "")
         return cls(**toml.load(path))
 
 

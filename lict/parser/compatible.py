@@ -3,6 +3,7 @@
 # Date: 2023/12/18
 # Contact: liuza20@lzu.edu.cn, zhzihao2023@lzu.edu.cn
 
+import warnings
 import argparse
 import itertools
 
@@ -11,7 +12,8 @@ from rich.progress import track
 
 from .base import BaseParser
 from lict.checker import Checker
-from lict.constants import CompatibleType, ScopeElement
+from lict.constants import CompatibleType
+
 
 from lict.utils import GraphManager, combined_generator
 from lict.utils.structure import DualLicense, Scope, Config
@@ -52,7 +54,7 @@ class BaseCompatiblityParser(BaseParser):
         if license_a2b in compatible_results or license_b2a in compatible_results:
 
             if license_a2b != license_b2a and CompatibleType.UNCONDITIONAL_COMPATIBLE in (license_a2b, license_b2a):
-                Warning.warn(f"{license_a} -{license_a2b}-> {license_b}, {license_b} -{license_b2a}-> {license_a}.")
+                warnings.warn(f"{license_a} -{license_a2b}-> {license_b}, {license_b} -{license_b2a}-> {license_a}.")
             return license_a2b if license_a2b in compatible_results else license_b2a
 
         return CompatibleType.INCOMPATIBLE
@@ -62,13 +64,10 @@ class BaseCompatiblityParser(BaseParser):
         base_dl: DualLicense,
         other_dl: DualLicense = None,
         ignore_unk: bool = False,
+        blacklist: list[str] = None,
     ) -> tuple[DualLicense, DualLicense, bool]:
         """
         Check the compatibility between two dual licenses.
-
-        ! Attention: This method suppose that the dual licenses are in the same file. This behavior
-        ! will cause the method to not consider conditional compatibility. Once this set of Dual
-        ! Licenses cannot be unconditionally compatible, a conflict will be reported.
 
         Args:
             - dual_a: The dual licenses to be checked
@@ -76,6 +75,7 @@ class BaseCompatiblityParser(BaseParser):
         Returns:
             - The compatibility type of the two dual licenses
         """
+        blacklist = blacklist or []
 
         if not isinstance(base_dl, DualLicense):
             raise ValueError("base_dl should be a DualLicense  object")
@@ -123,10 +123,17 @@ class BaseCompatiblityParser(BaseParser):
                 )
 
                 for spdx_a, spdx_b in itertools.product(spdx_a_list, spdx_b_list):
+
+                    # * check if the license is in the blacklist, then incompatible
+                    if spdx_a in blacklist or spdx_b in blacklist:
+                        continue
+
                     result = self.check_compatiblity(spdx_a, spdx_b, scope_a, scope_b, ignore_unk)
                     if result != CompatibleType.INCOMPATIBLE:
                         break
 
+                # * after checking all the combinations of the licenses in the group
+                # * if the result is incompatible, then the group is incompatible
                 if result == CompatibleType.INCOMPATIBLE:
                     conflict.append((spdx_a, spdx_b))
                     conflict_flag = True
@@ -142,6 +149,7 @@ class BaseCompatiblityParser(BaseParser):
     def parse(self, project_path: str, context: GraphManager = None) -> GraphManager:
         ignore_unk = getattr(self.args, "ignore_unk", False)
         out_gml = getattr(self.args, "out_gml", "")
+        blacklist = getattr(self.config, "blacklist", [])
 
         for sub in track(nx.weakly_connected_components(context.graph), "Parsing compatibility..."):
             for current_node, parents, children in self.generate_processing_sequence(
@@ -156,11 +164,17 @@ class BaseCompatiblityParser(BaseParser):
                     # * check the current node first that has licenses
                     if node_a == current_node and (license_groups := context.nodes[current_node].get("licenses")):
 
-                        results, _, conflict_flag, conflict = self.filter_dual_pair(license_groups, ignore_unk=ignore_unk)
+                        results, _, conflict_flag, conflict = self.filter_dual_pair(
+                            license_groups, ignore_unk=ignore_unk, blacklist=blacklist
+                        )
 
                         if not results and conflict_flag:
                             edge = self.create_edge(
-                                node_a, node_a, label=CompatibleType.INCOMPATIBLE, type="compatible_result", conflict=conflict
+                                node_a,
+                                node_a,
+                                label=CompatibleType.INCOMPATIBLE,
+                                type="compatible_result",
+                                conflict=conflict,
                             )
                             context.add_edge(edge)
                         else:
@@ -192,7 +206,7 @@ class BaseCompatiblityParser(BaseParser):
                             continue
 
                         compatible_a, compatible_b, conflict_flag, conflict = self.filter_dual_pair(
-                            filtered_a, dual_b, ignore_unk=ignore_unk
+                            filtered_a, dual_b, ignore_unk=ignore_unk, blacklist=blacklist
                         )
 
                         if conflict_flag:
@@ -207,7 +221,11 @@ class BaseCompatiblityParser(BaseParser):
 
                             for node in conflict_stack:
                                 edge = self.create_edge(
-                                    node_a, node, compatible=incompatible_type, type="compatible_result", conflict=conflict
+                                    node_a,
+                                    node,
+                                    compatible=incompatible_type,
+                                    type="compatible_result",
+                                    conflict=conflict,
                                 )
                                 context.add_edge(edge)
                             # * terminate the loop
