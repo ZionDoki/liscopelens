@@ -1,15 +1,28 @@
-# coding=utf-8
-# Author: Zion
-# Date: 2024/06/06
-# Contact: liuza20@lzu.edu.cn
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+#
+# Copyright (c) 2024 Lanzhou University
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 
 import copy
+import warnings
 from .base import BaseParser
 from argparse import Namespace
 from lict.checker import Checker
 from lict.utils.graph import GraphManager, Edge
 from lict.utils.structure import Config, load_licenses, load_exceptions
-from lict.utils import find_all_versions, normalize_version, extract_version
 
 
 class BaseExceptionParser(BaseParser):
@@ -27,6 +40,8 @@ class BaseExceptionParser(BaseParser):
 
     def parse(self, project_path: str, context: GraphManager = None) -> GraphManager:
         save_kg = getattr(self.args, "save_kg", False)
+        ignore_unk = getattr(self.args, "ignore_unk", False)
+
         blacklist = getattr(self.config, "blacklist", [])
 
         visited_licenses, new_for_infer = set(), {}
@@ -38,25 +53,32 @@ class BaseExceptionParser(BaseParser):
 
             for group in dual_license:
                 for unit in group:
+
+                    if unit["spdx_id"] not in self.all_licenes:
+                        if not ignore_unk:
+                            warnings.warn(f"Unknown license: {unit['spdx_id']}")
+                        continue
+
+                    new_feat = self.all_licenes[unit["spdx_id"]]
                     for exception in unit["exceptions"]:
-                        spdx_id = unit["spdx_id"] + "-with-" + exception
-
-                        if spdx_id in visited_licenses:
-                            continue
-
-                        visited_licenses.add(spdx_id)
-
-                        if self.checker.is_license_exist(spdx_id):
-                            continue
-
                         if exception not in self.all_exceptions:
+                            if not ignore_unk:
+                                raise ValueError(f"Unknown exception: {exception}")
                             continue
 
-                        if unit["spdx_id"] not in self.all_licenes:
-                            continue
+                        new_feat = new_feat.cover_from(self.all_exceptions[exception])
 
-                        new_feat = self.all_licenes[unit["spdx_id"]].cover_from(self.all_exceptions[exception])
-                        new_for_infer[new_feat.spdx_id] = new_feat
+                    if new_feat == self.all_licenes[unit["spdx_id"]]:
+                        continue
+
+                    if self.checker.is_license_exist(new_feat.spdx_id):
+                        continue
+
+                    if new_feat.spdx_id in visited_licenses:
+                        continue
+
+                    visited_licenses.add(new_feat.spdx_id)
+                    new_for_infer[new_feat.spdx_id] = new_feat
 
         self.checker.infer.check_compatibility({**self.all_licenes, **new_for_infer})
         if save_kg:
