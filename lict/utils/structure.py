@@ -1,3 +1,21 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+#
+# Copyright (c) 2024 Lanzhou University
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 import os
 import re
 import json
@@ -337,6 +355,14 @@ class LicenseFeat:
         return cls(spdx_id, **toml.load(path))
 
     def cover_from(self, other: "LicenseFeat") -> "LicenseFeat":
+        """
+        License add exception from another exception license. We call this behavior as cover because
+        the exception license will cover the original license. Almost all cases, the exception license
+        will have less restriction than the original license and add some exception to the original license.
+
+        ! Attention: this method do not implement that multiple exception licenses can cover the original license
+        ! work like a union operation. This method only cover the original license with a single exception license.
+        """
         return self.__class__(
             spdx_id=self.spdx_id + "-with-" + other.spdx_id,
             can={**self.can, **other.can},
@@ -426,7 +452,7 @@ class DualUnit(dict):
     """
 
     def __init__(self, spdx_id: str, condition=None, exceptions=[], filename=None):
-        super().__init__(spdx_id=spdx_id, condition=condition, exceptions=exceptions,filename=filename)
+        super().__init__(spdx_id=spdx_id, condition=condition, exceptions=exceptions, filename=filename)
 
     def __hash__(self):
         return hash((self["spdx_id"], self.get("condition", ""), tuple(self.get("exceptions", []))))
@@ -436,6 +462,7 @@ class DualUnit(dict):
             return False
 
         return self.__hash__() == other.__hash__()
+
 
 class DualLicense(set):
     """
@@ -474,12 +501,9 @@ class DualLicense(set):
         for group in self:
             new_group = set()
             for unit in group:
-
                 new_group.add(DualUnit(unit["spdx_id"], conditon, unit["exceptions"], unit["filename"]))
-                if not unit["condition"] or unit["condition"] == conditon:
+                if unit["condition"] and unit["condition"] != conditon:
                     new_group.add(unit)
-                else:
-                    new_group.update([(license, unit["condition"]), (license, conditon)])
             new.add(tuple(new_group))
         return new
 
@@ -585,7 +609,7 @@ class SPDXParser:
                 current_results = self.expand_expression(expression[idx])
                 idx += 1
             elif isinstance(expression[idx], DualUnit):
-                expression[idx]['filename'] = self.filepath
+                expression[idx]["filename"] = self.filepath
                 current_results = DualLicense.from_list([[expression[idx]]])
                 idx += 1
 

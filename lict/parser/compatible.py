@@ -1,7 +1,20 @@
-# coding=utf-8
-# Author: Zion, Zihao Zhang
-# Date: 2023/12/18
-# Contact: liuza20@lzu.edu.cn, zhzihao2023@lzu.edu.cn
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+#
+# Copyright (c) 2024 Lanzhou University
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 
 import warnings
 import argparse
@@ -13,7 +26,6 @@ from rich.progress import track
 from .base import BaseParser
 from lict.checker import Checker
 from lict.constants import CompatibleType
-
 
 from lict.utils import GraphManager, combined_generator
 from lict.utils.structure import DualLicense, Scope, Config
@@ -85,12 +97,15 @@ class BaseCompatiblityParser(BaseParser):
 
         if other_dl is None:
             other_dl = base_dl
+            # * check blacklist and add license to conflict list
+            # * remove blacklist license check compatibility
 
         base_compatible = DualLicense()
         other_compatbile = DualLicense()
 
         conflict_flag = False
         conflict = []
+
         for base_group, other_group in itertools.product(base_dl, other_dl):
 
             conflict_flag = False
@@ -110,27 +125,17 @@ class BaseCompatiblityParser(BaseParser):
                 scope_a = Scope({conds_a: set()}) if conds_a else conds_a
                 scope_b = Scope({conds_b: set()}) if conds_b else conds_b
 
-                spdx_a_list = (
-                    [spdx_a + "-with-" + exception for exception in license_a["exceptions"]]
-                    if license_a["exceptions"]
-                    else [spdx_a]
+                spdx_a = (
+                    "-with-".join([spdx_a] + sorted(license_a["exceptions"])) if license_a["exceptions"] else spdx_a
                 )
 
-                spdx_b_list = (
-                    [spdx_b + "-with-" + exception for exception in license_b["exceptions"]]
-                    if license_b["exceptions"]
-                    else [spdx_b]
+                spdx_b = (
+                    "-with-".join([spdx_b] + sorted(license_b["exceptions"])) if license_b["exceptions"] else spdx_b
                 )
 
-                for spdx_a, spdx_b in itertools.product(spdx_a_list, spdx_b_list):
-
-                    # * check if the license is in the blacklist, then incompatible
-                    if spdx_a in blacklist or spdx_b in blacklist:
-                        continue
-
-                    result = self.check_compatiblity(spdx_a, spdx_b, scope_a, scope_b, ignore_unk)
-                    if result != CompatibleType.INCOMPATIBLE:
-                        break
+                result = self.check_compatiblity(spdx_a, spdx_b, scope_a, scope_b, ignore_unk)
+                if result != CompatibleType.INCOMPATIBLE:
+                    break
 
                 # * after checking all the combinations of the licenses in the group
                 # * if the result is incompatible, then the group is incompatible
