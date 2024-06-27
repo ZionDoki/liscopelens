@@ -36,4 +36,4 @@ protect_scope = []
 
 [cannot.use_trademark]
 escape_scope = []
-protect_scope = ["trad  emark"]
+protect_scope = ["trademark"]

@@ -458,9 +458,7 @@ class ClauseConflictRule(CompatibleRule):
         )
 
         if already_compatible:
-            edge = self.new_edge(license_a, license_b, compatibility=CompatibleType.UNCONDITIONAL_COMPATIBLE)
-            graph.add_edge(edge)
-            return EndRule, None
+            return DefaultCompatibleRule, None
 
         condition_scope = Scope.universe()
         conflict_flag = False

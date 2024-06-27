@@ -20,10 +20,6 @@ escape_scope = []
 protect_scope = []
 escape_scope = []
 
-[can.provide_warranty]
-protect_scope = []
-escape_scope = []
-
 [cannot.use_trademark]
 protect_scope = ["trademark"]
 escape_scope = []
