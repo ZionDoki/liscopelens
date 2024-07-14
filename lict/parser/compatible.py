@@ -16,46 +16,79 @@
 # limitations under the License.
 #
 
+import os
+import time
 import warnings
 import argparse
 import itertools
+from uuid import uuid4
 
+from typing import Generator, Optional
 import networkx as nx
-from rich.progress import track
+from rich.progress import Progress
 
-from .base import BaseParser
 from lict.checker import Checker
 from lict.constants import CompatibleType
 
-from lict.utils import GraphManager, combined_generator
+from lict.utils import GraphManager, set2list
 from lict.utils.structure import DualLicense, Scope, Config
+
+from .base import BaseParser
 
 
 class BaseCompatiblityParser(BaseParser):
 
     arg_table = {
         "--ignore-unk": {"action": "store_true", "help": "Ignore unknown licenses", "default": False},
-        "--out-gml": {"type": str, "help": "The output path of the graph", "default": ""},
+        "--output": {"type": str, "help": "The outputs path", "default": ""},
     }
 
     def __init__(self, args: argparse.Namespace, config: Config):
         super().__init__(args, config)
         self.checker = Checker()
 
-    def parse_condition(self, condition: str) -> str:
-        return self.config.literal2enum(condition)
-
-    def reverse_topological_sort(self, graph):
-        return reversed(list(nx.topological_sort(graph)))
+    def topological_traversal(self, graph: nx.DiGraph) -> Generator[str, None, None]:
+        """Topological sort the graph"""
+        return nx.topological_sort(graph)
 
     def generate_processing_sequence(self, graph):
-        nodes_to_process = self.reverse_topological_sort(graph)
+        """
+        Generate the processing sequence of the graph
+
+        Args:
+            - graph (nx.DiGraph | nx.MultiDiGraph): The graph to be processed
+
+        Returns:
+            iterator: The iterator of the processing sequence
+        """
+        nodes_to_process = self.topological_traversal(graph)
         for node in nodes_to_process:
             parents = graph.predecessors(node)
             children = graph.successors(node)
             yield node, parents, children
 
-    def check_compatiblity(self, license_a: str, license_b: str, scope_a: Scope, scope_b: Scope, ignore_unk=False):
+    def check_compatiblity(
+        self, license_a: str, license_b: str, scope_a: Scope, scope_b: Scope, ignore_unk=False
+    ) -> CompatibleType:
+        """
+        Check the compatibility between two licenses
+
+        Usage:
+            ```
+            parser = BaseCompatiblityParser(args, config)
+            parser.check_compatiblity("GPL-2.0-only", "GPL-3.0-or-later", Scope.from_str("UNIVERSAL"))
+            ```
+
+        Args:
+            - license_a (str): The first license
+            - license_b (str): The second license
+            - scope_a (Scope): The scope of the first license
+            - scope_b (Scope): The scope of the second license
+            - ignore_unk (bool): Ignore unknown licenses
+
+        Returns:
+            CompatibleType: The compatibility type
+        """
         compatible_results = (CompatibleType.CONDITIONAL_COMPATIBLE, CompatibleType.UNCONDITIONAL_COMPATIBLE)
         if ignore_unk:
             compatible_results += (CompatibleType.UNKNOWN,)
@@ -71,192 +104,164 @@ class BaseCompatiblityParser(BaseParser):
 
         return CompatibleType.INCOMPATIBLE
 
-    def filter_dual_pair(
+    def filter_dual_license(
         self,
-        base_dl: DualLicense,
-        other_dl: DualLicense = None,
+        dual_lic: DualLicense,
+        blacklist: Optional[list[str]] = None,
         ignore_unk: bool = False,
-        blacklist: list[str] = None,
-    ) -> tuple[DualLicense, DualLicense, bool]:
+    ) -> tuple[DualLicense, set[frozenset[str]]]:
         """
-        Check the compatibility between two dual licenses.
+        Check the compatibility of the dual license, filter group that contains the blacklist license or conflict license.
 
         Args:
-            - dual_a: The dual licenses to be checked
+            - dual_lic (DualLicense): The dual license
+            - blacklist (list[str]): The blacklist of the licenses
+            - ignore_unk (bool): Ignore unknown licenses
 
         Returns:
-            - The compatibility type of the two dual licenses
+            DualLicense: The compatible dual licenses
+            tuple[frozenset[str]]: The conflict licenses
+            tuple[frozenset[str]]: The hit conflict licenses
         """
+
+        if not isinstance(dual_lic, DualLicense):
+            raise ValueError("dual_lic should be a DualLicense object")
+
+        if not dual_lic:
+            return DualLicense(), set()
+
+        conflicts = set()
         blacklist = blacklist or []
 
-        if not isinstance(base_dl, DualLicense):
-            raise ValueError("base_dl should be a DualLicense  object")
+        new_dual_lic = dual_lic.copy()
 
-        if other_dl is not None and not isinstance(other_dl, DualLicense):
-            raise ValueError("other_dl should be a DualLicense  object")
+        for group in dual_lic:
 
-        if other_dl is None:
-            other_dl = base_dl
-            # * check blacklist and add license to conflict list
-            # * remove blacklist license check compatibility
+            if group not in new_dual_lic:
+                continue
 
-        base_compatible = DualLicense()
-        other_compatbile = DualLicense()
+            for lic in group:
+                if frozenset((lic,)) in conflicts:
+                    new_dual_lic.remove(group)
+                    continue
 
-        conflict_flag = False
-        conflict = []
+                if lic.unit_spdx in blacklist:
+                    conflicts.add(frozenset((lic.unit_spdx,)))
+                    new_dual_lic.remove(group)
 
-        for base_group, other_group in itertools.product(base_dl, other_dl):
+        for group in dual_lic:
 
-            conflict_flag = False
+            if group not in new_dual_lic:
+                continue
 
-            if ignore_unk:
-                base_group = tuple(filter(lambda x: self.checker.is_license_exist(x["spdx_id"]), base_group))
-                other_group = tuple(filter(lambda x: self.checker.is_license_exist(x["spdx_id"]), other_group))
+            group_rm_flag = False
 
-            for license_a, license_b in itertools.product(base_group, other_group):
-                spdx_a, spdx_b = license_a["spdx_id"], license_b["spdx_id"]
-                conds_a = license_a["condition"]
-                conds_b = license_b["condition"]
+            new_group = filter(lambda x: (self.checker.is_license_exist(x.unit_spdx) or not ignore_unk), group)
+
+            for license_a, license_b in itertools.combinations(new_group, 2):
 
                 if license_a["spdx_id"] == license_b["spdx_id"]:
                     continue
 
-                scope_a = Scope({conds_a: set()}) if conds_a else conds_a
-                scope_b = Scope({conds_b: set()}) if conds_b else conds_b
+                if frozenset((license_a.unit_spdx, license_b.unit_spdx)) in conflicts:
+                    group_rm_flag = True
+                    continue
 
-                spdx_a = (
-                    "-with-".join([spdx_a] + sorted(license_a["exceptions"])) if license_a["exceptions"] else spdx_a
-                )
+                scope_a = Scope({license_a["condition"]: set()}) if license_a["condition"] else license_a["condition"]
+                scope_b = Scope({license_b["condition"]: set()}) if license_b["condition"] else license_b["condition"]
 
-                spdx_b = (
-                    "-with-".join([spdx_b] + sorted(license_b["exceptions"])) if license_b["exceptions"] else spdx_b
-                )
-
-                result = self.check_compatiblity(spdx_a, spdx_b, scope_a, scope_b, ignore_unk)
-                if result != CompatibleType.INCOMPATIBLE:
-                    break
-
-                # * after checking all the combinations of the licenses in the group
-                # * if the result is incompatible, then the group is incompatible
+                result = self.check_compatiblity(license_a.unit_spdx, license_b.unit_spdx, scope_a, scope_b, ignore_unk)
                 if result == CompatibleType.INCOMPATIBLE:
-                    conflict.append((spdx_a, spdx_b))
-                    conflict_flag = True
-                    break
+                    conflicts.add(frozenset((license_a.unit_spdx, license_b.unit_spdx)))
+                    group_rm_flag = True
 
-            # * check all the licenses in the group are compatible then add the group to the compatible results
-            if not conflict_flag:
-                base_compatible.add(base_group)
-                other_compatbile.add(other_group)
+            if group_rm_flag:
+                new_dual_lic.remove(group)
 
-        return base_compatible, other_compatbile, conflict_flag, conflict
+        return new_dual_lic, conflicts
 
-    def parse(self, project_path: str, context: GraphManager = None) -> GraphManager:
+    def is_conflict_happened(self, dual_lic: Optional[DualLicense], conflicts: set[frozenset[str]]) -> bool:
+        """
+        Check if the conflict happened in the dual license
+
+        Args:
+            - dual_lic (DualLicense): The dual license
+            - conflicts (set[frozenset[str]]): The conflict licenses
+
+        Returns:
+            bool: If the conflict happened
+        """
+
+        if not dual_lic:
+            return False
+
+        for group in dual_lic:
+            if not any(lic in [du.unit_spdx for du in group] for lic in itertools.chain(*conflicts)):
+                return False
+
+        return True
+
+    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
+        """
+        Parse the compatibility of the licenses
+
+        This method will parse the compatibility of the licenses in the graph. But only adopt the scenario that the
+        licenses in file level, and these file will package to the single binary file or something like that.
+
+        Args:
+            - project_path (str): The path of the project, **but not used**.
+            - context (GraphManager): The context of the graph
+
+        Returns:
+            GraphManager: The context of the graph
+        """
+
         ignore_unk = getattr(self.args, "ignore_unk", False)
-        out_gml = getattr(self.args, "out_gml", "")
         blacklist = getattr(self.config, "blacklist", [])
 
-        for sub in track(nx.weakly_connected_components(context.graph), "Parsing compatibility..."):
-            for current_node, parents, children in self.generate_processing_sequence(
-                context.graph.subgraph(sub).copy()
-            ):
+        if not context:
+            raise ValueError("The context should not be None")
 
-                candidate_nodes = tuple(combined_generator([current_node], children))
+        with Progress() as progress:
+            start_time = time.time()
+            total_nodes = len(context.graph.nodes)
+            task = progress.add_task("[red]Parsing compatibility...", total=total_nodes)
+            for sub in nx.weakly_connected_components(context.graph):
+                for current_node, _, children in self.generate_processing_sequence(context.graph.subgraph(sub).copy()):
 
-                for i, node_a in enumerate(candidate_nodes):
+                    dual_before_check = context.nodes[current_node].get("before_check", None)
 
-                    conflict_stack = []
-                    # * check the current node first that has licenses
-                    if node_a == current_node and (license_groups := context.nodes[current_node].get("licenses")):
+                    if dual_before_check is None:
+                        progress.update(task, advance=1)
+                        continue
 
-                        results, _, conflict_flag, conflict = self.filter_dual_pair(
-                            license_groups, ignore_unk=ignore_unk, blacklist=blacklist
-                        )
+                    dual_after_check, conflicts = self.filter_dual_license(
+                        dual_before_check, blacklist=blacklist, ignore_unk=ignore_unk
+                    )
 
-                        if not results and conflict_flag:
-                            edge = self.create_edge(
-                                node_a,
-                                node_a,
-                                label=CompatibleType.INCOMPATIBLE,
-                                type="compatible_result",
-                                conflict=conflict,
-                            )
-                            context.add_edge(edge)
-                        else:
-                            context.nodes[node_a]["outbound_license"] = results
+                    if not dual_after_check:
 
-                    filtered_a = context.nodes[node_a].get("compatible_license", None)
-                    if not filtered_a:
-                        filtered_a = context.nodes[node_a].get("outbound_license", None)
+                        uuid = str(uuid4())
+                        current_licenses = context.nodes[current_node].get("licenses", None)
+                        context.nodes[current_node]["conflict"] = {
+                            "id": uuid,
+                            "conflicts": str(set2list(conflicts)),
+                        }
 
-                    for node_b in candidate_nodes[i + 1 :]:
+                        if self.is_conflict_happened(current_licenses, conflicts):
+                            context.nodes[current_node]["conflict_id"] = uuid
 
-                        dual_b = context.nodes[node_b].get("compatible_license", None)
-                        if not dual_b:
-                            dual_b = context.nodes[node_b].get("outbound_license", None)
+                        for child in children:
+                            licenses = context.nodes[child].get("outbound", None)
+                            if self.is_conflict_happened(licenses, conflicts):
+                                context.nodes[child]["conflict_id"] = uuid
 
-                        if (node_a == current_node) and dual_b:
-                            if condition := self.parse_condition(context.nodes[node_b].get("type", None)):
-                                context.nodes[node_b]["outbound_license"] = dual_b.add_condition(condition)
-                                if condition in self.config.license_isolations:
-                                    context.nodes[node_b]["license_isolation"] = True
+                    progress.update(
+                        task, advance=1, description=f"[red]Processing compatibility {time.time() - start_time:.2f}s"
+                    )
 
-                        if not (filtered_a and dual_b):
-                            continue
+        if output := getattr(self.args, "output", None):
+            os.makedirs(output, exist_ok=True)
+            context.save(output + "/compatible_checked.gml")
 
-                        if context.nodes[node_a].get("license_isolation", False):
-                            continue
-
-                        if context.nodes[node_b].get("license_isolation", False):
-                            continue
-
-                        compatible_a, compatible_b, conflict_flag, conflict = self.filter_dual_pair(
-                            filtered_a, dual_b, ignore_unk=ignore_unk, blacklist=blacklist
-                        )
-
-                        if conflict_flag:
-                            conflict_stack.append(node_b)
-
-                        if not compatible_a:
-                            incompatible_type = (
-                                CompatibleType.PARTIAL_INCOMPATIBLE
-                                if len(conflict_stack) > 1
-                                else CompatibleType.INCOMPATIBLE
-                            )
-
-                            for node in conflict_stack:
-                                edge = self.create_edge(
-                                    node_a,
-                                    node,
-                                    compatible=incompatible_type,
-                                    type="compatible_result",
-                                    conflict=conflict,
-                                )
-                                context.add_edge(edge)
-                            # * terminate the loop
-                            break
-                        else:
-                            filtered_a = compatible_a
-                            context.nodes[node_a]["compatible_license"] = compatible_a
-                            context.nodes[node_b]["compatible_license"] = compatible_b
-
-                    # * 计算出站许可证
-                    if filtered_a and (outbound_from_a := filtered_a.get_outbound(self.config)):
-
-                        origin_nodes = context.get_predecessors_of_type(node_a, edge_type="spread_to")
-                        if origin_nodes:
-                            for origin_node in origin_nodes:
-                                edge = self.create_edge(origin_node, current_node, type="spread_to")
-                                context.add_edge(edge)
-                        else:
-                            edge = self.create_edge(node_a, current_node, type="spread_to")
-                            context.add_edge(edge)
-
-                        if current_outbound := context.nodes[current_node].get("outbound_license", None):
-                            context.nodes[current_node]["outbound_license"] = current_outbound & outbound_from_a
-                        else:
-                            context.nodes[current_node]["outbound_license"] = outbound_from_a
-
-        if out_gml:
-            context.save(out_gml)
         return context

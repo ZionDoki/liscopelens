@@ -16,14 +16,26 @@
 # limitations under the License.
 #
 
+"""
+Checker and Rules for license itself compatible inference
+Inferring compatibility based on structured information
+"""
+
 import json
 import itertools
 
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple, Type
-
+from typing import Dict, Type, Optional, Callable
 from copy import deepcopy
-from lict.utils.scaffold import *
+
+from lict.utils.scaffold import (
+    is_file_in_resources,
+    get_resource_path,
+    normalize_version,
+    extract_version,
+    find_all_versions,
+    find_duplicate_keys,
+)
 from lict.utils.structure import (
     Scope,
     Schemas,
@@ -35,15 +47,6 @@ from lict.utils.structure import (
 )
 from lict.utils.graph import Edge, GraphManager, Triple, Vertex
 from .constants import Settings, CompatibleType, FeatureProperty
-
-
-from rich.progress import track
-
-
-"""
-Checker and Rules for license itself compatible inference
-Inferring compatibility based on structured information
-"""
 
 
 def generate_knowledge_graph(reinfer: bool = False) -> "CompatibleInfer":
@@ -67,16 +70,16 @@ def generate_knowledge_graph(reinfer: bool = False) -> "CompatibleInfer":
         infer = CompatibleInfer(schemas=schemas)
         infer.check_compatibility(all_licenses)
 
-        for license_name, license in all_licenses.items():
-            infer.check_license_property(license)
+        for _, lic in all_licenses.items():
+            infer.check_license_property(lic)
 
         infer.save()
 
     infer = CompatibleInfer(schemas=schemas)
 
     destination = get_resource_path()
-    infer.properties_graph = GraphManager(destination.joinpath(Settings.LICENSE_PROPERTY_GRAPH))
-    infer.compatible_graph = GraphManager(destination.joinpath(Settings.LICENSE_COMPATIBLE_GRAPH))
+    infer.properties_graph = GraphManager(str(destination.joinpath(Settings.LICENSE_PROPERTY_GRAPH)))
+    infer.compatible_graph = GraphManager(str(destination.joinpath(Settings.LICENSE_COMPATIBLE_GRAPH)))
     return infer
 
 
@@ -96,13 +99,27 @@ class CompatibleRule(ABC):
             cls.__instance = super(CompatibleRule, cls).__new__(cls)
         return cls.__instance
 
-    def __init__(self, add_callback: callable, schemas: Schemas = None) -> None:
+    def __init__(self, add_callback: Callable, schemas: Schemas) -> None:
         super().__init__()
         self.add_callback = add_callback
         self.schemas = schemas
 
+    def callback(
+        self,
+        licenses: Dict[str, LicenseFeat],
+        graph: GraphManager,
+        license_a: LicenseFeat,
+        license_b: LicenseFeat,
+    ):
+        """Callback function to be executed after the rule is checked."""
+
     def new_edge(
-        self, license_a: LicenseFeat, license_b: LicenseFeat, compatibility: CompatibleType, scope: str = None, **kwargs
+        self,
+        license_a: LicenseFeat,
+        license_b: LicenseFeat,
+        compatibility: CompatibleType,
+        scope: Optional[str] = None,
+        **kwargs,
     ):
         if scope is None:
             return Edge(
@@ -122,6 +139,7 @@ class CompatibleRule(ABC):
         )
 
     def get_callback(self, *args, **kwargs):
+        """Get the callback function with arguments."""
         return lambda: self.callback(*args, **kwargs)
 
     def has_edge(
@@ -135,18 +153,8 @@ class CompatibleRule(ABC):
 
     @abstractmethod
     def __call__(
-        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Edge = None
-    ) -> Tuple[Type["CompatibleRule"], Edge]:
-        """
-        Check if the licenses are compatible based on the rule.
-
-        Args:
-            license_a: LicenseFeat, the license to be compared.
-            license_b: LicenseFeat, the license to be compared.
-            graph: GraphManager, the graph to store the compatibility result.
-        Returns:
-            bool, True to ignore the remaining rules.
-        """
+        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Optional[Edge] = None
+    ) -> tuple[Type["CompatibleRule"], Optional[Edge]]:
         pass
 
 
@@ -155,8 +163,8 @@ class EndRule(CompatibleRule):
     end_rule: bool = True
 
     def __call__(
-        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Edge = None
-    ) -> Tuple[Type["CompatibleRule"], Edge]:
+        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Optional[Edge] = None
+    ) -> tuple[Type[CompatibleRule], Optional[Edge]]:
         return EndRule, edge
 
 
@@ -166,8 +174,8 @@ class DefaultCompatibleRule(CompatibleRule):
     """
 
     def __call__(
-        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Edge = None
-    ) -> Tuple[type[CompatibleRule] | Edge]:
+        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Optional[Edge] = None
+    ) -> tuple[Type[CompatibleRule], Optional[Edge]]:
         edge = self.new_edge(license_a, license_b, compatibility=CompatibleType.UNCONDITIONAL_COMPATIBLE)
         graph.add_edge(edge)
         return EndRule, edge
@@ -183,8 +191,8 @@ class PublicDomainRule(CompatibleRule):
     start_rule: bool = True
 
     def __call__(
-        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Edge = None
-    ) -> Tuple[type[CompatibleRule] | Edge]:
+        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Optional[Edge] = None
+    ) -> tuple[Type[CompatibleRule], Optional[Edge]]:
         if license_a.spdx_id == "public-domain" or license_b.spdx_id == "public-domain":
             edge = self.new_edge(license_a, license_b, compatibility=CompatibleType.UNCONDITIONAL_COMPATIBLE)
             graph.add_edge(edge)
@@ -202,8 +210,8 @@ class ImmutabilityRule(CompatibleRule):
     start_rule: bool = False
 
     def __call__(
-        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Edge = None
-    ) -> Tuple[type[CompatibleRule] | Edge]:
+        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Optional[Edge] = None
+    ) -> tuple[Type[CompatibleRule], Optional[Edge]]:
 
         license_a_immut = any(self.schemas.has_property(x, "immutability") for x in license_a.features)
         license_b_immut = any(self.schemas.has_property(x, "immutability") for x in license_b.features)
@@ -222,8 +230,8 @@ class ExceptRelicenseRule(CompatibleRule):
     """
 
     def __call__(
-        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Edge = None
-    ) -> Tuple[Type["CompatibleRule"], Edge]:
+        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Optional[Edge] = None
+    ) -> tuple[Type["CompatibleRule"], Optional[Edge]]:
         relicense_feat = license_a.special.get("relicense")
         if relicense_feat := license_a.special.get("relicense"):
             if len(relicense_feat.target) != 0:
@@ -277,7 +285,7 @@ class ExceptRelicenseRule(CompatibleRule):
                     origin_edge = graph.get_edge_data(edge_index)
                     origin_scope = Scope(json.loads(origin_edge["scope"]))
 
-                    new_compatible_scope = origin_scope & license_a.special["relicense"]
+                    new_compatible_scope = origin_scope & license_a.special["relicense"].scope
                     if not new_compatible_scope:
                         continue
 
@@ -285,7 +293,7 @@ class ExceptRelicenseRule(CompatibleRule):
                         license_a,
                         license_b,
                         compatibility=CompatibleType.CONDITIONAL_COMPATIBLE,
-                        scope=new_compatible_scope,
+                        scope=str(new_compatible_scope),
                     )
                     graph.add_edge(edge)
 
@@ -297,17 +305,17 @@ class OrLaterRelicenseRule(CompatibleRule):
     """
 
     def __call__(
-        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Edge = None
-    ) -> Tuple[type[CompatibleRule] | Edge]:
+        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Optional[Edge] = None
+    ) -> tuple[Type[CompatibleRule], Optional[Edge]]:
         if "or-later" in license_a.spdx_id:
             self.add_callback(lambda licenses, graph: self.callback(licenses, graph, license_a, license_b))
         return ComplianceRequirementRule, None
 
-    def get_normalized_version(self, spdx_id: str) -> str:
-        return normalize_version(extract_version(spdx_id))
+    def get_normalized_version(self, spdx_id: str) -> list[int]:
+        return normalize_version(extract_version(spdx_id) or "")
 
     def callback(
-        self, licenses: Dict[str, LicenseFeat], graph: GraphManager, license_a: LicenseFeat, license_b: LicenseFeat
+        self, licenses: dict[str, LicenseFeat], graph: GraphManager, license_a: LicenseFeat, license_b: LicenseFeat
     ) -> None:
         current_version = self.get_normalized_version(license_a.spdx_id)
         later_licenses = filter(
@@ -419,8 +427,8 @@ class ComplianceRequirementRule(CompatibleRule):
         return True
 
     def __call__(
-        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Edge = None
-    ) -> Tuple[Type["CompatibleRule"], Edge]:
+        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Optional[Edge] = None
+    ) -> tuple[Type[CompatibleRule], Optional[Edge]]:
 
         is_compliance = self.check_compliance(license_a, license_b)
         if not is_compliance:
@@ -449,8 +457,8 @@ class ClauseConflictRule(CompatibleRule):
     """
 
     def __call__(
-        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Edge = None
-    ) -> Tuple[Type["CompatibleRule"], Edge]:
+        self, license_a: LicenseFeat, license_b: LicenseFeat, graph: GraphManager, edge: Optional[Edge] = None
+    ) -> tuple[Type["CompatibleRule"], Optional[Edge]]:
 
         # ! Check *Other Direction* if <license_b, license_a> has already been compatible.
         already_compatible = self.has_edge(
@@ -532,11 +540,11 @@ class CompatibleInfer:
         end_rule: str, the end rule to check the compatibility.
     """
 
-    start_rule: str = None
-    end_rule: str = None
+    start_rule: str
+    end_rule: str
     rules: Dict[str, CompatibleRule] = {}
 
-    def __init__(self, schemas: Schemas = None, exceptions=None):
+    def __init__(self, schemas: Schemas, exceptions=None):
         self.callback_queque = []
         self.schemas = schemas
         self.exceptions = exceptions
@@ -544,14 +552,14 @@ class CompatibleInfer:
         self.compatible_graph = GraphManager()
 
         for rule in CompatibleRule.__subclasses__():
-            the_rule = rule(self.add_callback, schemas=schemas)
+            the_rule = rule(self.add_callback, schemas)
             self.rules[rule.__name__] = the_rule
             if rule.start_rule:
                 self.start_rule = rule.__name__
             if rule.end_rule:
                 self.end_rule = rule.__name__
 
-    def add_callback(self, callback: callable) -> None:
+    def add_callback(self, callback: Callable) -> None:
         self.callback_queque.append(callback)
 
     def check_license_property(self, license_a: LicenseFeat):
@@ -562,6 +570,18 @@ class CompatibleInfer:
 
         for feature in license_a.features:
             edge = Triple(license_vertex, Vertex(feature.name), name=feature.modal)
+
+            relicense_feat = license_a.special.get("relicense", None)
+            if relicense_feat:
+                for tgt in relicense_feat.target:
+                    relicense_edge = Triple(
+                        license_vertex,
+                        Vertex(tgt),
+                        name="relicense",
+                        scope=str(license_a.special["relicense"].scope),
+                    )
+                    self.properties_graph.add_triplet(relicense_edge)
+
             self.properties_graph.add_triplet(edge)
 
     def check_compatibility(self, licenses: Dict[str, LicenseFeat]):
@@ -616,7 +636,7 @@ class CompatibleInfer:
             callback = self.callback_queque.pop(0)
             callback(self.compatible_graph)
 
-    def save(self, dir_path: str = None):
+    def save(self, dir_path: Optional[str] = None):
         """
         Save the property and compatible graph to the data directory.
 

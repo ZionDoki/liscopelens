@@ -18,18 +18,21 @@
 
 from .build_gn_parser import GnParser
 
-from lict.parser.echo import EchoPaser
-from lict.parser.scancode import ScancodeParser
-from lict.parser.exception import BaseExceptionParser
-from lict.parser.base import BaseParser, BaseParserEntry
-from lict.parser.compatible import BaseCompatiblityParser
+from ..scancode import ScancodeParser
+from ..exception import BaseExceptionParser
+from ..base import BaseParser, BaseParserEntry
+from ..compatible import BaseCompatiblityParser
+from ..propagate import BasePropagateParser
+
+from ..user_parser.echo import EchoPaser
 
 
 class CParserEntry(BaseParserEntry):
-    parsers: tuple[BaseParser] = (
+    parsers = (
         GnParser,
         ScancodeParser,
         BaseExceptionParser,
+        BasePropagateParser,
         BaseCompatiblityParser,
         EchoPaser,
     )

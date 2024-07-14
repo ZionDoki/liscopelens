@@ -16,9 +16,13 @@
 # limitations under the License.
 #
 
+"""
+The base classes of Parsers.
+"""
 import argparse
 import warnings
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Optional, Type
+
 from abc import ABC, abstractmethod
 from lict.utils.graph import GraphManager, Vertex, Edge
 from lict.utils.structure import Config
@@ -42,17 +46,16 @@ class BaseParser(ABC):
         self.args = args
         self.config = config
 
-    def is_unk_license(self, spdx_id: str) -> bool:
-        return spdx_id not in self.licenses
-
-    def create_vertex(self, label: str, **kwargs: dict) -> Vertex:
+    def create_vertex(self, label: str, **kwargs: Any) -> Vertex:
+        """Create a vertex"""
         return Vertex(label, parser_name=self.__class__.__name__, **kwargs)
 
-    def create_edge(self, u: str, v: str, **kwargs: dict) -> Edge:
+    def create_edge(self, u: str, v: str, **kwargs: Any) -> Edge:
+        """Create an edge between two vertices"""
         return Edge(u, v, parser_name=self.__class__.__name__, **kwargs)
 
     @abstractmethod
-    def parse(self, project_path: str, context: GraphManager = None) -> GraphManager:
+    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
         """
         Parse the arguments and update the context
 
@@ -74,23 +77,24 @@ class BaseParserEntry:
         - arg_parser: The argument parser of this entry
     """
 
-    parsers: Tuple[BaseParser] = ()
+    parsers: Tuple[Type[BaseParser], ...]
     entry_help: str = ""
-    arg_parser: argparse.ArgumentParser = None
+    arg_parser: argparse.ArgumentParser | None = None
 
     def __init__(self, args: argparse.Namespace, config: Config):
         """
         when user input the command lict [entry_name] hit the enter key, the parser will be initialized.
         """
-        if len(self.parsers) == 0:
+        if self.parsers is None:
             raise NotImplementedError("No parsers found")
 
         if self.entry_help == "":
             warnings.warn("No entry help provided")
 
-        self.parsers = (p(args, config) for p in self.parsers)
+        self._parsers = (p(args, config) for p in self.parsers)
 
-    def parse(self, project_path: str, context: GraphManager = None, args: argparse.Namespace = None):
+    @abstractmethod
+    def parse(self, project_path: str, context: Optional[GraphManager] = None, args: argparse.Namespace | None = None):
         """
         Parse the arguments and update the context
 
@@ -109,5 +113,5 @@ class BaseParserEntry:
         if context is None:
             context = GraphManager()
 
-        for p in self.parsers:
+        for p in self._parsers:
             context = p.parse(project_path, context)

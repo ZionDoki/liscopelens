@@ -18,15 +18,34 @@
 
 import os
 import re
+import time
 import shutil
 import tempfile
 import importlib.resources
+from importlib.abc import Traversable
+
+from typing import Generator, Optional, TypeVar, Callable, Iterable
 from lict.constants import Settings
 
-from typing import Generator
+
+T = TypeVar("T")
 
 
-def load_resource(filename: str, package_name: str = None, source_name: str = None) -> str:
+def timer(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        ret = func(*args, **kwargs)
+        cons = time.time() - start
+        if cons > 1e-2:
+            print(f"{func.__name__} cost {cons} seconds")
+        if cons > 2:
+            raise ValueError(f"{func.__name__} cost {cons} seconds")
+        return ret
+
+    return wrapper
+
+
+def load_resource(filename: str, package_name: Optional[str] = None, source_name: Optional[str] = None) -> str:
     """
     Load a file from the resources of a package
 
@@ -42,14 +61,16 @@ def load_resource(filename: str, package_name: str = None, source_name: str = No
         source_name = Settings.RESOURCE_NAME
 
     if package_name is None:
-        package_name = f"{Settings.PACAKAGE_NAME}.{source_name}"
+        package_name = f"{Settings.PACKAGE_NAME}.{source_name}"
 
     resources = importlib.resources.files(package_name)
     with resources.joinpath(filename).open("r", encoding="utf8") as f:
         return f.read()
 
 
-def is_file_in_resources(filename: str, package_name: str = None, resource_name: str = None) -> bool:
+def is_file_in_resources(
+    filename: str, package_name: Optional[str] = None, resource_name: Optional[str] = None
+) -> bool:
     """
     Check if a file is in the resources of a package
 
@@ -65,43 +86,48 @@ def is_file_in_resources(filename: str, package_name: str = None, resource_name:
         resource_name = Settings.RESOURCE_NAME
 
     if package_name is None:
-        package_name = f"{Settings.PACAKAGE_NAME}.{resource_name}"
+        package_name = f"{Settings.PACKAGE_NAME}.{resource_name}"
 
     try:
-        return importlib.resources.is_resource(package_name, filename)
+        return importlib.resources.files(package_name).joinpath(filename).is_file()
     except ModuleNotFoundError:
         return False
 
 
-def write_to_resources(filename: str, content: str | bytes, package_name: str = None):
+def write_to_resources(filename: str, content: str, package_name: Optional[str] = None):
     """
     Write a file to the resources of a package
 
     Args:
         filename (str): the file name
         content (str): the content of the file
+        package_name (Optional[str]): the name of the package containing resources
 
     Returns:
         None, but write the file to the resources of the package
     """
 
     if package_name is None:
-        package_name = f"{Settings.PACAKAGE_NAME}.{Settings.RESOURCE_NAME}"
+        package_name = f"{Settings.PACKAGE_NAME}.{Settings.RESOURCE_NAME}"
 
     temp_dir = tempfile.mkdtemp()
 
     try:
         temp_file = os.path.join(temp_dir, filename)
-        with open(temp_file, "w") as f:
+        with open(temp_file, "w", encoding="utf-8") as f:
             f.write(content)
 
-        destination = importlib.resources.files(f"{package_name}")
-        shutil.copy(temp_file, os.path.join(destination, filename))
+        # 获取资源文件夹的路径
+        with importlib.resources.path(package_name, "") as destination:
+            shutil.copy(temp_file, os.path.join(destination, filename))
+
     finally:
         shutil.rmtree(temp_dir)
 
 
-def get_resource_path(file_name: str = None, package_name: str = None, resource_name: str = None) -> str:
+def get_resource_path(
+    file_name: Optional[str] = None, package_name: Optional[str] = None, resource_name: Optional[str] = None
+) -> Traversable:
     """
     Get the path to the resources of a package
 
@@ -113,7 +139,7 @@ def get_resource_path(file_name: str = None, package_name: str = None, resource_
         str: the path to the resources of the package
     """
 
-    package_name = package_name if package_name else Settings.PACAKAGE_NAME
+    package_name = package_name if package_name else Settings.PACKAGE_NAME
     resource_name = resource_name if resource_name else Settings.RESOURCE_NAME
 
     resource_path = f"{package_name}.{resource_name}"
@@ -133,20 +159,22 @@ def delete_duplicate_str(data: list[str]) -> list[str]:
 
     Returns:
         list[str]: the list without duplicate strings
+
+    ! deprecated in next version
     """
-    immutable_dict = set([str(item) for item in data])
-    data = [eval(i) for i in immutable_dict]
-    return data
+    # 使用集合去除重复项
+    unique_data = list(set(data))
+    return unique_data
 
 
-def find_duplicate_keys(dict_a: dict[str, any], dict_b: dict[str, any]) -> set[str]:
+def find_duplicate_keys(dict_a: dict[str, T], dict_b: dict[str, T]) -> set[str]:
     """
     TODO: Add docstring
     """
     return set(dict_a.keys()) & set(dict_b.keys())
 
 
-def zip_with_none(list_a: list[any], list_b: list[any]):
+def zip_with_none(list_a: list[T], list_b: list[T]):
     """
     TODO: Add docstring
     """
@@ -188,7 +216,7 @@ def extract_folder_name(path: str) -> str:
         return path
 
 
-def combined_generator(origin_generator: Generator, *args: list[Generator]):
+def combined_generator(origin_generator: Generator | list, *args: list[Generator]):
     """
     Combine multiple generators into one generator.
 
@@ -237,7 +265,7 @@ def normalize_version(version: str) -> list[int]:
     return [int(x) for x in re.sub(r"(\.0+)*$", "", version).split(".")]
 
 
-def find_all_versions(spdx_idx: str, licenses: list[str], filter_func: callable = None) -> list[str]:
+def find_all_versions(spdx_idx: str, licenses: Iterable[str], filter_func: Optional[Callable] = None) -> list[str]:
     """
     Find all versions of a license.
 
@@ -253,3 +281,24 @@ def find_all_versions(spdx_idx: str, licenses: list[str], filter_func: callable 
     return [
         license for license in licenses if license.split("-")[0] == prefix and (not filter_func or filter_func(license))
     ]
+
+
+def set2list(data: set) -> list:
+    """
+    Convert a set to a list.
+
+    Args:
+        data (set): The input set.
+
+    Returns:
+        list: The output list.
+    """
+    if isinstance(data, (set, frozenset)):
+        return [set2list(item) for item in data]
+    elif isinstance(data, dict):
+        return {key: set2list(value) for key, value in data.items()}
+    elif isinstance(data, (list, tuple)):
+        converted = (set2list(item) for item in data)
+        return list(converted) if isinstance(data, list) else tuple(converted)
+    else:
+        return data

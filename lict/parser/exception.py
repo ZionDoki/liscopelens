@@ -16,19 +16,42 @@
 # limitations under the License.
 #
 
+"""
+The basic parser for the exception licenses.
+"""
+
 import copy
 import warnings
-from .base import BaseParser
 from argparse import Namespace
+
+from typing import Optional
+
 from lict.checker import Checker
 from lict.utils.graph import GraphManager, Edge
 from lict.utils.structure import Config, load_licenses, load_exceptions
 
+from .base import BaseParser
+
 
 class BaseExceptionParser(BaseParser):
+    """
+    Base class for the exception parser.
+
+    Usage:
+        ```
+        class OtherParser(BaseExceptionParser):
+
+            ... # implement the parse method
+
+        parser = OtherParser(args, config)
+        parser.parse(project_path, context)
+        ```
+
+    """
 
     arg_table = {
-        "--save-kg": {"action": "store_true", "help": "Save new knowledge graph after infer parse", "default": False}
+        "--ignore-unk": {"action": "store_true", "help": "Ignore unknown licenses", "default": False},
+        "--save-kg": {"action": "store_true", "help": "Save new knowledge graph after infer parse", "default": False},
     }
 
     def __init__(self, args: Namespace, config: Config):
@@ -38,7 +61,11 @@ class BaseExceptionParser(BaseParser):
         self.all_licenes = load_licenses()
         self.all_exceptions = load_exceptions()
 
-    def parse(self, project_path: str, context: GraphManager = None) -> GraphManager:
+    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
+
+        if context is None:
+            raise ValueError("The context is required for the exception parser.")
+
         save_kg = getattr(self.args, "save_kg", False)
         ignore_unk = getattr(self.args, "ignore_unk", False)
 
@@ -46,7 +73,7 @@ class BaseExceptionParser(BaseParser):
 
         visited_licenses, new_for_infer = set(), {}
 
-        for node_label, node_data in context.nodes(data=True):
+        for _, node_data in context.nodes(data=True):
             dual_license = node_data.get("licenses")
             if not dual_license:
                 continue

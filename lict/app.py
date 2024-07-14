@@ -16,14 +16,19 @@
 # limitations under the License.
 #
 
+"""
+This module provides the command line interface of the project.
+"""
+
 import argparse
 
-from .infer import *
+# from .infer import *
 from .utils import load_config
 from .parser import PARSER_ENTRIES
 
 
 def cli():
+    """Command line interface of the project."""
     parser = argparse.ArgumentParser(description="部件兼容性分析工具")
     parser.add_argument("-c", "--config", type=str, default="", help="配置文件路径")
 
@@ -31,8 +36,12 @@ def cli():
     for entry_name, parser_entry in PARSER_ENTRIES.items():
         sub_parser = subparsers.add_parser(entry_name, help=parser_entry.entry_help)
         arg_groups = {}
+        setted_args = set()
         for p in parser_entry.parsers:
             for args_name, args_setting in p.arg_table.items():
+
+                if args_name in setted_args:
+                    continue
 
                 if "group" in args_setting:
                     group_name = args_setting.pop("group")
@@ -40,9 +49,10 @@ def cli():
                         arg_groups[group_name] = sub_parser.add_mutually_exclusive_group(required=True)
 
                     arg_groups[group_name].add_argument(args_name, **args_setting)
-
                 else:
                     sub_parser.add_argument(args_name, **args_setting)
+
+                setted_args.add(args_name)
 
     args = parser.parse_args()
 

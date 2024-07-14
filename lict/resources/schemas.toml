@@ -64,7 +64,7 @@ compliance = []
 immutability = []
 
 [actions.impose_further_restriction]
-compliance = ["cannot"]
+compliance = ["cannot", "must"]
 immutability = []
 
 [actions.display_announcement]
