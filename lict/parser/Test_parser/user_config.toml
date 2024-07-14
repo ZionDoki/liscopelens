@@ -1,0 +1,11 @@
+[Pair_1]
+license_A = "AGPL-3.0"
+license_B = "APSL-2.0"
+condition = ["1","2","3"]
+description = ["AGPL-3.0 AND APSL-2.0"]
+
+[Pair_2]
+license_A = "(Apache-2.0 AND MIT)"
+license_B = "GPL-2.0-only"
+condition = ["1"]
+description = ["Apache-2.0 AND MIT AND GPL-2.0-only"]

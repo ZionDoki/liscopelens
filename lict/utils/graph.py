@@ -188,6 +188,19 @@ class GraphManager:
         """get the predecessors of the node."""
         return self.graph.predecessors(node)
 
+    def get_ancestors(self, node, depth):
+        current_level_nodes = [node]
+        ancestors = []
+
+        for _ in range(depth):
+            next_level_nodes = []
+            for n in current_level_nodes:
+                preds = self.predecessors(n)
+                next_level_nodes.extend(preds)
+            current_level_nodes = next_level_nodes
+            ancestors.extend(current_level_nodes)
+        return list(set(ancestors))
+
     def is_leaf(self, node: str):
         """check if the node is a leaf."""
         return self.graph.out_degree(node) == 0
@@ -455,11 +468,98 @@ class GraphManager:
         target_node = self.query_node_by_label(node_label)
         if target_node:
             target_node[new_attribute] = new_value
+<<<<<<< Updated upstream
             # ? repair for typing check
             self.graph.add_node(node_label, **target_node)
+=======
+            # self.graph.nodes[node_label] = target_node
+            nx.set_node_attributes(self.graph, {node_label: target_node})
+>>>>>>> Stashed changes
             return self
         else:
             raise ValueError(f"Node with label '{node_label}' not found in the graph.")
+
+    def get_subgraph_depth(self, start_node=None, depth=2, leaf_flag=True):
+        """
+        Get a subgraph with a specified depth from the start node.
+
+        Args:
+            start_node (str): The label of the start node.
+            depth (int): The depth of the subgraph.
+            leaf_flag (bool): The start_node type.
+
+        Returns:
+            GraphManager: The subgraph with the specified depth.
+        """
+        if leaf_flag is False:
+            nodes_to_visit = [start_node]
+            visited_nodes = set()
+            current_depth = 0
+
+            while nodes_to_visit and current_depth < depth:
+                next_nodes = []
+                for node in nodes_to_visit:
+                    if node not in visited_nodes:
+                        visited_nodes.add(node)
+                        next_nodes.extend(self.successors(node))
+                nodes_to_visit = next_nodes
+                current_depth += 1
+            print(visited_nodes)
+            new_graph = GraphManager()
+            new_graph.graph = self.graph.subgraph(visited_nodes)
+            return new_graph
+        else:
+            leaf_nodes = []
+            for node in self.graph.nodes:
+                if self.graph.out_degree(node) == 0:
+                    n = self.query_node_by_label(node)
+                    if n["type"] == "code":
+                        leaf_nodes.append(node)
+            context_list = []
+            for leaf in leaf_nodes:
+                ancestors = self.get_ancestors(leaf, 2)
+                if ancestors:
+                    start_node = ancestors[0]
+                    nodes_to_visit = [start_node]
+                    visited_nodes = set()
+                    current_depth = 0
+
+                    while nodes_to_visit and current_depth < depth:
+                        next_nodes = []
+                        for node in nodes_to_visit:
+                            if node not in visited_nodes:
+                                visited_nodes.add(node)
+                                next_nodes.extend(self.graph.successors(node))
+                        nodes_to_visit = next_nodes
+                        current_depth += 1
+                    subgraph = GraphManager()
+                    subgraph.graph = self.graph.subgraph(visited_nodes)
+                    context_list.append(subgraph)
+            return context_list
+
+    def get_sibling_pairs(self) -> list[tuple[str, str]]:
+        """
+        Find all pairs of sibling nodes (nodes with the same parent) in the graph.
+
+        Returns:
+            list[tuple[str, str]]: A list of tuples where each tuple contains two sibling node labels.
+        """
+        sibling_pairs = []
+        parent_to_children = defaultdict(list)
+
+        # Build a dictionary mapping parents to their children
+        for node in self.graph.nodes:
+            for pred in self.graph.predecessors(node):
+                parent_to_children[pred].append(node)
+
+        # Find sibling pairs
+        for children in parent_to_children.values():
+            if len(children) > 1:
+                for i in range(len(children)):
+                    for j in range(i + 1, len(children)):
+                        sibling_pairs.append((children[i], children[j]))
+
+        return sibling_pairs
 
     def save(self, file_path: str, stringizer=None):
         """save the graph to the file."""
