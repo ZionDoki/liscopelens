@@ -16,21 +16,28 @@
 # limitations under the License.
 #
 
+"""
+The structure module defines the basic data structures for representing and calculating the scope of effectiveness of
+license terms. The module also provides the operator class, parser class, and loader functions for the license and
+exception licenses.
+"""
+
 import os
 import re
 import json
 import itertools
+from pathlib import Path
+from typing import Optional, Callable
 from dataclasses import dataclass, field
 
 import toml
 
-from .scaffold import get_resource_path
 from lict.constants import ScopeToken
-from lict.constants import ScopeElement
+from .scaffold import get_resource_path, timer
 
 
 @dataclass
-class LicenseSpread:
+class LicenseSpread(dict):
     """
     Define the license spread mechanism occur in which usage conditions.
 
@@ -52,9 +59,8 @@ class Config:
     Properties:
         blacklist: list[str], list of licenses that will be black listed
         license_isolations: list[str], list of licenses that will be isolated
-        license_spread: LicenseSpread, define the spread conditions
         literal_mapping: dict[str, str], mapping of the usage literals to ScopeElment enum
-
+        permissiver_spreads: list[str], list of conditions that will make a permissive license spread
     Methods:
         literal2enum(literal: str) -> str: convert usage literal to ScopeElement enum
         enum2literal(enum: str) -> set[str]: convert ScopeElement enum to usage literals
@@ -63,16 +69,45 @@ class Config:
 
     blacklist: list[str] = field(default_factory=list)
     license_isolations: list[str] = field(default_factory=list)
-    license_spread: LicenseSpread = field(default_factory=LicenseSpread)
+    permissive_spreads: list[str] = field(default_factory=list)
     literal_mapping: dict[str, str] = field(default_factory=dict)
 
-    def __post_init__(self):
-        self.license_spread = LicenseSpread(**self.license_spread)
+    def literal2enum(self, literal: str) -> Optional[str]:
+        """
+        Convert usage literal to ScopeElement enum.
 
-    def literal2enum(self, literal: str) -> str:
-        return self.literal_mapping.get(literal, "")
+        Usage:
+        ```
+        config = Config(literal_mapping={"COPYLEFT": "COMPLIANCE"})
+        print(config.literal2enum("COPYLEFT"))
+        # Output: "COMPLIANCE"
+        ```
+
+        Args:
+            literal: str, usage literal
+
+        Returns:
+            str: ScopeElement enum
+        """
+        return self.literal_mapping.get(literal, None)
 
     def enum2literal(self, enum: str) -> set[str]:
+        """
+        Convert ScopeElement enum to usage literals.
+
+        Usage:
+        ```
+        config = Config(literal_mapping={"COPYLEFT": "COMPLIANCE"})
+        print(config.enum2literal("COMPLIANCE"))
+        # Output: {"COPYLEFT"}
+        ```
+
+        Args:
+            enum: str, ScopeElement enum
+
+        Returns:
+            set[str]: set of usage literals
+        """
         return {k for k, v in self.literal_mapping.items() if enum in v}
 
     @classmethod
@@ -138,35 +173,42 @@ class Scope(dict[str, set[str]]):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    @timer
     def __and__(self, other: "Scope") -> "Scope":
         simplified_other = self._simplify(other)
         simplified_self = self._simplify(self)
 
         new = self.__class__()
 
-        if simplified_self.get(ScopeToken.UNIVERSE, False) != False:
+        if simplified_self.get(ScopeToken.UNIVERSE, False) is not False:
             for k in simplified_other:
                 new[k] = simplified_other[k] | simplified_self[ScopeToken.UNIVERSE]
 
-        if simplified_other.get(ScopeToken.UNIVERSE, False) != False:
+        if simplified_other.get(ScopeToken.UNIVERSE, False) is not False:
             for k in simplified_self:
                 new[k] = simplified_self[k] | simplified_other[ScopeToken.UNIVERSE]
 
         for k in simplified_self:
-            if simplified_other.get(k, False) == False:
+            if simplified_other.get(k, False) is False:
                 continue
 
             new[k] = simplified_self[k] | simplified_other[k] | new.get(k, set())
         return self._simplify(new)
 
-    def __contains__(self, other: object) -> bool:
+    def __contains__(self, other: "Scope") -> bool:
+
+        if other is None:
+            if not self:
+                return True
+            return False
+
         simplified_self = self._simplify(self)
         simplified_other = self._simplify(other)
 
         uncontains_scope = Scope({})
 
         for k in simplified_other:
-            if simplified_self.get(k, False) != False:
+            if simplified_self.get(k, False) is not False:
                 remains = simplified_self[k] - simplified_other[k]
                 if remains:
                     uncontains_scope[k] = remains
@@ -176,7 +218,7 @@ class Scope(dict[str, set[str]]):
         if not uncontains_scope:
             return True
 
-        if simplified_self.get(ScopeToken.UNIVERSE, False) == False:
+        if simplified_self.get(ScopeToken.UNIVERSE, False) is False:
             return False
 
         for k in uncontains_scope:
@@ -193,7 +235,7 @@ class Scope(dict[str, set[str]]):
         visited_keys = []
 
         for k in simplified_self:
-            if simplified_other.get(k, False) == False:
+            if simplified_other.get(k, False) is False:
                 new[k] = simplified_self[k]
                 continue
 
@@ -201,7 +243,7 @@ class Scope(dict[str, set[str]]):
 
             intersection = simplified_self[k] & simplified_other[k]
             if not intersection:
-                new[k] = {}
+                new[k] = set()
                 continue
 
             new[k] = intersection
@@ -288,11 +330,11 @@ class ActionFeat:
 
     def __post_init__(self):
 
-        if self.protect_scope == []:
-            self.protect_scope = [ScopeToken.UNIVERSE]
-
-        if self.protect_scope == None:
+        if self.protect_scope is None:
             self.protect_scope = []
+
+        elif len(self.protect_scope) == 0:
+            self.protect_scope = [ScopeToken.UNIVERSE]
 
         self.scope = Scope({k: set(self.escape_scope) for k in self.protect_scope})
 
@@ -378,7 +420,7 @@ class Schemas:
     Schema for licenses, that define the properties of actions.
 
     Properties:
-        actions: list[dict], list of actions
+        actions: dict of actions
         action_index: dict[str, list[str], index of actions
 
     Methods:
@@ -389,7 +431,7 @@ class Schemas:
         __getitem__(key: str) -> dict: get the action properties
     """
 
-    actions: list[dict]
+    actions: dict
 
     action_index: dict[str, list[str]] = field(default_factory=dict)
 
@@ -403,12 +445,14 @@ class Schemas:
                     self.action_index[key] = action_name
 
     @property
-    def properties(self) -> tuple[str]:
+    def properties(self) -> tuple[str, ...]:
+        """Get the properties of the actions."""
         return tuple(self.action_index.keys())
 
-    def has_property(self, action: ActionFeat, property: str) -> bool:
-        if action.name in self.action_index.get(property, []):
-            if action.modal in self[action.name][property]:
+    def has_property(self, action: ActionFeat, prop: str) -> Optional[bool]:
+        """Check if an action has a property."""
+        if action.name in self.action_index.get(prop, []):
+            if action.modal in self[action.name][prop]:
                 return True
 
     def __getitem__(self, key: str) -> dict:
@@ -416,6 +460,7 @@ class Schemas:
 
     @classmethod
     def from_toml(cls, path: str) -> "Schemas":
+        """Load schema from a toml file."""
         return cls(**toml.load(path))
 
 
@@ -429,7 +474,7 @@ class ActionFeatOperator:
         return feat_a.scope & feat_b.scope
 
     @staticmethod
-    def contains(feat_a: ActionFeat, feat_b: ActionFeat) -> Scope:
+    def contains(feat_a: ActionFeat, feat_b: ActionFeat) -> bool:
         return feat_b.scope in feat_a.scope
 
     @staticmethod
@@ -445,47 +490,102 @@ class DualUnit(dict):
         spdx_id: str, SPDX ID of the license
         condition: str, condition of the license
         exceptions: list[str], list of exceptions
-        filename: str, where license from
 
     Magic Methods:
         __hash__() -> int: hash the object
     """
 
-    def __init__(self, spdx_id: str, condition=None, exceptions=[], filename=None):
-        super().__init__(spdx_id=spdx_id, condition=condition, exceptions=exceptions, filename=filename)
+    __spdx_id_with_exceptions: Optional[str] = None
 
-    def __hash__(self):
+    def __init__(self, spdx_id: str, condition: Optional[str] = None, exceptions: Optional[list[str]] = None):
+        if not exceptions:
+            exceptions = []
+
+        super().__init__(spdx_id=spdx_id, condition=condition, exceptions=exceptions)
+
+    def __hash__(self) -> int:
         return hash((self["spdx_id"], self.get("condition", ""), tuple(self.get("exceptions", []))))
 
-    def __eq__(self, other):
-        if not isinstance(other, DualUnit):
-            return False
+    @property
+    def unit_spdx(self) -> str:
+        """
+        Get the SPDX ID (with exceptions) of the license.
 
-        return self.__hash__() == other.__hash__()
+        Usage:
+            ```python
+            unit = DualUnit("MIT", condition="WITH", exceptions=["GPL-3.0-exception"])
+            print(unit.unit_spdx)
+            # Output: "MIT-with-GPL-3.0-exception"
+
+            unit = DualUnit("MIT")
+            print(unit.unit_spdx)
+            # Output: "MIT"
+            ```
+
+        Returns:
+            str: SPDX ID of the license with exceptions
+        """
+        if not self.__spdx_id_with_exceptions:
+            self.__spdx_id_with_exceptions = "-with-".join([self["spdx_id"]] + sorted(self["exceptions"]))
+        return self.__spdx_id_with_exceptions
 
 
-class DualLicense(set):
+class DualLicense(set[frozenset[DualUnit]]):
     """
-    Dual licenses class. Use to represent dual licenses in a set[tuple[tuple[str, str]]] structure.
+    Dual licenses class. Use to represent dual licenses in a set[fronsenset[DualUnit]] structure.
+
+    Usage:
+        Because the license have dual circumstances, we use a set of frozenset[DualUnit] to represent the dual licenses.
+        Each fronzenset in the set represents a `group` of licenses.
+
+        ```
+        licenses = [
+            [DualUnit("MIT"), DualUnit("GPL-3.0")],
+            [DualUnit("MIT"), DualUnit("GPL-3.0", condition="WITH", exceptions=["GPL-3.0-exception"])]
+        ]
+
+        dual_license = DualLicense(licenses)
+        # or
+        dual_license = DualLicense.from_list(licenses)
+        ```
     """
 
     @classmethod
-    def from_list(cls, licenses: list[list[DualUnit]]) -> "DualLicense":
-        return cls(tuple({DualUnit(**license) for license in group}) for group in licenses)
+    def from_list(cls, licenses: list[list[DualUnit] | frozenset[DualUnit]]) -> "DualLicense":
+        """
+        Create a DualLicense object from a list of licenses.
+
+        Usage:
+            ```python
+            licenses = [
+                [DualUnit("MIT"), DualUnit("GPL-3.0")],
+                [DualUnit("MIT"), DualUnit("GPL-3.0", condition="WITH", exceptions=["GPL-3.0-exception"])]
+            ]
+            dual_license = DualLicense.from_list(licenses)
+            ```
+
+        Args:
+            licenses: list[list[DualUnit]], list of licenses
+
+        Returns:
+            DualLicense: a DualLicense
+        """
+        return cls(frozenset({DualUnit(**license) for license in group}) for group in licenses)
 
     @classmethod
     def from_str(cls, licenses: str) -> "DualLicense":
-        licenses = json.loads(licenses)
-        return cls.from_list(licenses)
+        """Create a DualLicense object from a string."""
+        licenses_list = json.loads(licenses)
+        return cls.from_list(licenses_list)
 
     def __bool__(self) -> bool:
-        return len(self) != 0 and self != {()}
+        return len(self) != 0 and self != {frozenset()}
 
     def __str__(self) -> str:
-        return json.dumps(self, default=lambda o: list(o))
+        return json.dumps(self, default=list)
 
     def __and__(self, other: "DualLicense") -> "DualLicense":
-        return DualLicense.from_list([tuple({*lic1, *lic2}) for lic1, lic2 in itertools.product(self, other)])
+        return DualLicense((lic1 | lic2 for lic1, lic2 in itertools.product(self, other)))
 
     def __iand__(self, other: "DualLicense") -> "DualLicense":
         return self.__and__(other)
@@ -496,62 +596,99 @@ class DualLicense(set):
     def __ior__(self, other: "DualLicense") -> "DualLicense":
         return self.__or__(other)
 
-    def add_condition(self, conditon: str) -> "DualLicense":
-        new = DualLicense()
-        for group in self:
-            new_group = set()
-            for unit in group:
-                new_group.add(DualUnit(unit["spdx_id"], conditon, unit["exceptions"], unit["filename"]))
-                if unit["condition"] and unit["condition"] != conditon:
-                    new_group.add(unit)
-            new.add(tuple(new_group))
-        return new
+    def copy(self) -> "DualLicense":
+        return self.__class__(super().copy())
 
-    def get_outbound(self, config: Config) -> "DualLicense":
-        default_spread = "DEFAULT" in config.license_spread.spread_conditions
+    def add_condition(self, conditon: Optional[str]) -> "DualLicense":
+        """
+        Add a condition to the licenses.
 
-        if not self:
+        Usage:
+            ```python
+            dual_license = DualLicense.from_list([
+                [DualUnit("MIT"), DualUnit("GPL-3.0")],
+                [DualUnit("MIT"), DualUnit("GPL-3.0", condition="WITH", exceptions=["GPL-3.0-exception"])]
+            ])
+            dual_license.add_condition("dynamic_linking")
+            ```
+        """
+        if not conditon:
             return self
 
         new = DualLicense()
         for group in self:
             new_group = set()
-            for license in group:
-
-                if license["condition"] in config.license_spread.spread_conditions:
-                    new_group.add(DualUnit(license["spdx_id"], None, license["exceptions"], license["filename"]))
-
-                elif default_spread and license["condition"] not in config.license_spread.spread_conditions:
-                    new_group.add(DualUnit(license["spdx_id"], None, license["exceptions"], license["filename"]))
-
-            new.add(tuple(new_group))
+            for unit in group:
+                new_group.add(DualUnit(unit["spdx_id"], conditon, unit["exceptions"]))
+                if unit["condition"] and unit["condition"] != conditon:
+                    new_group.add(unit)
+            new.add(frozenset(new_group))
         return new
+
+    @staticmethod
+    def merge_group(set1: set[DualUnit], set2: set[DualUnit]) -> set[DualUnit]:
+        """
+        Merge two sets of DualUnit instances, combining the 'filename' property of duplicates.
+
+        :param set1: The first set of DualUnit instances.
+        :param set2: The second set of DualUnit instances.
+        :return: A new set with merged DualUnit instances.
+        """
+        # 使用字典来暂时存储合并的结果，键为 DualUnit 的哈希值
+        merged = {}
+        for du in set1.union(set2):
+            hash_val = hash(du)
+            if hash_val in merged:
+                merged[hash_val]["filename"] = merged[hash_val]["filename"].union(du["filename"])
+            else:
+                merged[hash_val] = du
+
+        return set(merged.values())
 
 
 class SPDXParser:
+    """
+    SPDX expression parser.
 
-    def __call__(self, expression, filepath=None, expand=False, proprocessor: callable = None):
+    Usage:
+        ```
+        parser = SPDXParser()
+        parser("MIT AND GPL-3.0")
+        # return DualUnit tuple
+
+        parser("MIT AND (GPL-3.0 OR Apache-2.0)", expand=True)
+        # return DualLicense
+        ```
+    """
+
+    expression: str
+    filepath: Optional[str]
+    tokens: list[str]
+    current: int
+
+    def __call__(self, expression, filepath: Optional[str] = None, proprocessor: Optional[Callable] = None):
         self.expression = expression
         self.filepath = filepath
         self.tokens = []
         self.current = 0
-        self.expression = self.parse(proprocessor)
-        if expand:
-            return self.expand_expression(self.expression)
-        return self.expression
+        self.expression = self.parse(proprocessor)  # type: ignore
+        return self.expand_expression(self.expression)
 
     def tokenize(self):
+        """Tokenize the expression"""
         token_pattern = re.compile(r"\s*(WITH|AND|OR|\(|\)|[a-zA-Z0-9\.-]+)\s*")
         self.tokens = token_pattern.findall(self.expression)
 
-    def parse(self, proprocessor: callable = None):
+    def parse(self, proprocessor: Optional[Callable] = None):
+        """Parse the expression"""
         self.tokenize()
         result = self.parse_expression(proprocessor)
         if self.current < len(self.tokens):
             raise SyntaxError(f"Unexpected token at the end of expression {self.tokens}")
         return result
 
-    def parse_expression(self, proprocessor: callable = None):
+    def parse_expression(self, proprocessor: Optional[Callable] = None):
+        """Parse the expression"""
         terms = (self.parse_term(proprocessor),)
         while self.current < len(self.tokens) and self.tokens[self.current] in ("AND", "OR", "WITH"):
             op = self.tokens[self.current]
@@ -563,7 +700,7 @@ class SPDXParser:
                 if isinstance(terms[-1], tuple):
                     raise SyntaxError("WITH operator must be followed by single spdx not compound expression")
 
-                terms[-1]["exceptions"] = [*terms[-1]["exceptions"], self.tokens[self.current]]
+                terms[-1]["exceptions"] = [*terms[-1]["exceptions"], self.tokens[self.current]]  # type: ignore
                 self.current += 1
                 continue
             self.current += 1
@@ -572,7 +709,8 @@ class SPDXParser:
             return terms
         return terms
 
-    def parse_term(self, proprocessor: callable = None):
+    def parse_term(self, proprocessor: Optional[Callable] = None):
+        """Parse the term"""
         if self.current >= len(self.tokens):
             raise SyntaxError("Unexpected end of expression")
 
@@ -584,16 +722,18 @@ class SPDXParser:
                 raise SyntaxError("Missing closing parenthesis")
             self.current += 1
             return expr
-        elif token == ")":
-            raise SyntaxError("Unexpected closing parenthesis")
-        else:
-            self.current += 1
-            return DualUnit(proprocessor(token)) if proprocessor else DualUnit(token)
 
-    def expand_expression(self, expression):
+        if token == ")":
+            raise SyntaxError("Unexpected closing parenthesis")
+
+        self.current += 1
+        return DualUnit(proprocessor(token)) if proprocessor else DualUnit(token)
+
+    def expand_expression(self, expression) -> DualLicense:
+        """Expand the expression"""
         idx = 0
         previous_op = "AND"
-        results = DualLicense.from_list([[]])
+        results = DualLicense([frozenset()])
         while idx < len(expression):
             if expression[idx] == "AND":
                 previous_op = "AND"
@@ -609,8 +749,7 @@ class SPDXParser:
                 current_results = self.expand_expression(expression[idx])
                 idx += 1
             elif isinstance(expression[idx], DualUnit):
-                expression[idx]["filename"] = self.filepath
-                current_results = DualLicense.from_list([[expression[idx]]])
+                current_results = DualLicense((frozenset([expression[idx]]),))
                 idx += 1
 
             if previous_op == "AND":
@@ -623,7 +762,7 @@ class SPDXParser:
         return results
 
 
-def load_licenses(path: str = None) -> dict[str, LicenseFeat]:
+def load_licenses(path: Optional[str] = None) -> dict[str, LicenseFeat]:
     """
     Load licenses from a directory of toml files
 
@@ -635,14 +774,14 @@ def load_licenses(path: str = None) -> dict[str, LicenseFeat]:
     """
 
     if path is None:
-        path = get_resource_path(resource_name="resources.licenses")
+        path = str(get_resource_path(resource_name="resources.licenses"))
 
     paths = filter(lambda x: not x.startswith("schemas") and x.endswith(".toml"), os.listdir(path))
 
     return {lic.spdx_id: lic for p in paths if (lic := LicenseFeat.from_toml(os.path.join(path, p)))}
 
 
-def load_exceptions(path: str = None) -> dict[str, LicenseFeat]:
+def load_exceptions(path: Optional[str] = None) -> dict[str, LicenseFeat]:
     """
     Load exceptions from a directory of toml files
 
@@ -653,14 +792,14 @@ def load_exceptions(path: str = None) -> dict[str, LicenseFeat]:
         dict[str, LicenseFeat]: dictionary of exceptions
     """
     if path is None:
-        path = get_resource_path(resource_name="resources.exceptions")
+        path = str(get_resource_path(resource_name="resources.exceptions"))
 
     paths = filter(lambda x: not x.startswith("schemas") and x.endswith(".toml"), os.listdir(path))
 
     return {lic.spdx_id: lic for p in paths if (lic := LicenseFeat.from_toml(os.path.join(path, p)))}
 
 
-def load_schemas(path: str = None) -> Schemas:
+def load_schemas(path: Optional[str] = None) -> Schemas:
     """
     Load schema from a toml file
 
@@ -672,12 +811,12 @@ def load_schemas(path: str = None) -> Schemas:
     """
 
     if path is None:
-        path = get_resource_path()
+        path = str(get_resource_path())
 
     return Schemas.from_toml(os.path.join(path, "schemas.toml"))
 
 
-def load_config(path: str = None) -> Config:
+def load_config(path: Optional[str] = None) -> Config:
     """
     Load Config from a toml file
 
@@ -689,6 +828,6 @@ def load_config(path: str = None) -> Config:
     """
 
     if path is None:
-        path = os.path.join(get_resource_path(resource_name="config"), "default.toml")
+        path = str(get_resource_path(file_name="default.toml", resource_name="config"))
 
     return Config.from_toml(path)

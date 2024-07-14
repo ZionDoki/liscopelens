@@ -24,6 +24,10 @@ escape_scope = []
 protect_scope = []
 escape_scope = []
 
+[cannot.impose_further_restriction]
+protect_scope = []
+escape_scope = ["trademark"]
+
 [must.include_original]
 protect_scope = []
 escape_scope = []

@@ -16,19 +16,20 @@
 # limitations under the License.
 #
 
-import os
-import warnings
-
-import networkx as nx
-from typing import Iterator
-from collections import defaultdict
-from matplotlib import pyplot as plt
-
 """
 TODO: need write ut for this module @Zihao
 """
 
-EdgeIndex = tuple[str, str, int]
+import os
+import warnings
+from collections import defaultdict
+from typing import Iterator, Optional, MutableMapping, Mapping
+
+import networkx as nx
+from matplotlib import pyplot as plt
+
+
+EdgeIndex = tuple[str, str, Optional[int]]
 
 
 class Vertex(dict):
@@ -90,7 +91,7 @@ class Triple:
     A wrapper for the triple of (Vertex, Edge, Vertex) in networkx graph.
     """
 
-    def __init__(self, source: Vertex, target: Vertex, edge: Edge = None, **kwargs) -> None:
+    def __init__(self, source: Vertex, target: Vertex, edge: Edge | None = None, **kwargs) -> None:
         """
         init a triple object that can be added to the networkx graph.
 
@@ -113,11 +114,11 @@ class GraphManager:
     A wrapper for networkx graph, the graph is a MultiDiGraph object.
     """
 
-    _root_nodes: list = None
-    _leaf_nodes: list = None
+    _root_nodes: list | None = None
+    _leaf_nodes: list | None = None
     _edge_keys_to_exclude: set = {"u_for_edge", "v_for_edge", "key"}
 
-    def __init__(self, file_path: str = None) -> None:
+    def __init__(self, file_path: str | None = None) -> None:
         """
         Create Graph structure that can be used to store the graph data.
         It can be initialized from a file or a new graph, and save it to a file.
@@ -144,18 +145,8 @@ class GraphManager:
         return self.graph.edges(**kwargs)
 
     @property
-    def in_edges(self):
-        """wrapper for the in_edges of the networkx."""
-        return self.graph.in_edges
-
-    @property
-    def out_edges(self):
-        """wrapper for the out_edges of the networkx."""
-        return self.graph.out_edges
-
-    @property
     def root_nodes(self) -> list:
-        if self._root_nodes == None:
+        if self._root_nodes is None:
             self._root_nodes = [node for node in self.graph.nodes if self.graph.in_degree(node) == 0]
         return self._root_nodes
 
@@ -173,7 +164,7 @@ class GraphManager:
         new_keys = defaultdict(int)
         new_graph = nx.MultiDiGraph()
 
-        for u, v, key, data in self.graph.edges(data=True, keys=True):
+        for u, v, _, data in self.graph.edges(data=True, keys=True):
             edge_tuple = (u, v, frozenset(data.items()))
             if edge_tuple not in seen:
                 seen.add(edge_tuple)
@@ -242,7 +233,7 @@ class GraphManager:
         """
         self.graph.add_node(**vertex)
 
-    def get_node(self, node: Vertex) -> any:
+    def get_node(self, node: Vertex) -> MutableMapping | None:
         """
         get the node object from the graph.
 
@@ -267,7 +258,7 @@ class GraphManager:
 
         return self.query_edge_by_label(**edge)
 
-    def get_edge_data(self, edge_index: EdgeIndex) -> dict:
+    def get_edge_data(self, edge_index: EdgeIndex) -> Mapping:
         """
         get the edge data from the graph.
 
@@ -278,11 +269,11 @@ class GraphManager:
             edge_data: the edge data that get from the graph.
         """
         if edge_index[2] == -1:
-            edge_index = (edge_index[0], edge_index[1])
+            edge_index = (edge_index[0], edge_index[1], None)
 
         return self.graph.get_edge_data(*edge_index)
 
-    def get_node_data(self, node_label: str) -> dict:
+    def get_node_data(self, node_label: str) -> Optional[Mapping]:
         """
         get the node data from the graph.
 
@@ -319,7 +310,7 @@ class GraphManager:
         new_graph.graph = self.graph.subgraph(nodes)
         return new_graph
 
-    def query_node_by_label(self, label: str) -> Vertex:
+    def query_node_by_label(self, label: str) -> MutableMapping | None:
         """
         get the node object from the graph.
 
@@ -331,7 +322,7 @@ class GraphManager:
         """
         return self.graph.nodes.get(label)
 
-    def query_edge_by_label(self, u_for_edge: str, v_for_edge: str, key=-1, **kwargs) -> EdgeIndex:
+    def query_edge_by_label(self, u_for_edge: str, v_for_edge: str, key=-1, **kwargs) -> list[EdgeIndex]:
         """
         get the edge object from the graph.
 
@@ -360,7 +351,7 @@ class GraphManager:
 
         if all(isinstance(key, str) for key in edge_dict.keys()):
             return [
-                (u_for_edge, v_for_edge, key) for item in filter(lambda x: self._compare_edge(x, kwargs), [edge_dict])
+                (u_for_edge, v_for_edge, key) for _ in filter(lambda x: self._compare_edge(x, kwargs), edge_dict.keys())
             ]
 
         if all(isinstance(key, int) for key in edge_dict.keys()):
@@ -464,18 +455,15 @@ class GraphManager:
         target_node = self.query_node_by_label(node_label)
         if target_node:
             target_node[new_attribute] = new_value
-            self.graph.nodes[node_label] = target_node
+            # ? repair for typing check
+            self.graph.add_node(node_label, **target_node)
             return self
         else:
-            raise Exception(f"Node with label '{node_label}' not found in the graph.")
+            raise ValueError(f"Node with label '{node_label}' not found in the graph.")
 
     def save(self, file_path: str, stringizer=None):
         """save the graph to the file."""
-
-        if not stringizer:
-            stringizer = lambda x: str(x)
-
-        nx.write_gml(self.graph, file_path, stringizer=stringizer)
+        nx.write_gml(self.graph, file_path, stringizer=stringizer if stringizer else str)
 
     @classmethod
     def load_from_disk(cls, file_path: str):

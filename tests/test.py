@@ -8,7 +8,7 @@ from lict.utils.structure import *
 from lict.parser import *
 
 
-class TestLicenseTools(unittest.TestCase):
+class TestLicense(unittest.TestCase):
     """unit test for every model in license-tool"""
 
     def test_utils_licenses(self):
@@ -26,8 +26,8 @@ class TestLicenseTools(unittest.TestCase):
 
         self.assertEqual(
             set(schemas.properties),
-            set(["immutability", "compliance"]),
-            "schemas properties need equal to ['immutability', 'compliance']",
+            set(["conflicts", "immutability", "compliance"]),
+            f"schemas properties need equal to ['immutability', 'compliance'] but {set(schemas.properties)}",
         )
 
         test = ActionFeat("modify", "cannot", ["a"], ["b"])
@@ -104,14 +104,52 @@ class TestLicenseTools(unittest.TestCase):
 
         generate_knowledge_graph(reinfer=True)
 
-        self.assertFalse(checker.check_license_exist("MITR"), "MITR should not exist in the license graph")
+        self.assertFalse(checker.is_license_exist("MITR"), "MITR should not exist in the license graph")
 
-        self.assertTrue(checker.check_license_exist("MIT"), "MIT should exist in the license graph")
+        self.assertTrue(checker.is_license_exist("MIT"), "MIT should exist in the license graph")
 
         self.assertAlmostEqual(
             checker.check_compatibility("LGPL-2.1-only", "Apache-2.0", scope=Scope({"dynamic_linking": set()})),
             CompatibleType.CONDITIONAL_COMPATIBLE,
             "LGPL-2.1-only and Apache-2.0 should be CONDITIONAL_COMPATIBLE",
+        )
+
+    def test_structure(self):
+
+        # load licenses
+
+        checker = Checker()
+
+        licenses = load_licenses()
+
+        self.assertTrue(
+            licenses,
+            "Load licenses failed",
+        )
+
+        feat_a = DualUnit("MIT")
+        feat_b = DualUnit("GPL-2.0-only")
+
+        feat_c = DualUnit("Apache-2.0")
+
+    def test_graph(self):
+        checker = Checker()
+
+        print(checker.get_modal_features("MIT", "can"))
+
+        self.assertFalse(
+            checker.is_copyleft("MIT"),
+            "MIT should not be copyleft",
+        )
+
+        self.assertFalse(
+            checker.is_copyleft("Apache-2.0"),
+            "Apache-2.0 should not be copyleft",
+        )
+
+        self.assertTrue(
+            checker.is_copyleft("GPL-2.0-only"),
+            "GPL-2.0-only should be copyleft",
         )
 
 

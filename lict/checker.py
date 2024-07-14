@@ -18,10 +18,11 @@
 
 import warnings
 
+from typing import Optional
+
+from lict.constants import CompatibleType
 from lict.infer import generate_knowledge_graph
-from lict.constants import Settings, CompatibleType
 from lict.utils.structure import LicenseFeat, Scope
-from lict.utils import GraphManager, get_resource_path
 
 
 class Checker:
@@ -45,10 +46,12 @@ class Checker:
 
     @property
     def properties_graph(self):
+        """Return the properties graph"""
         return self.infer.properties_graph
 
     @property
     def compatible_graph(self):
+        """Wrapper for the compatible graph"""
         return self.infer.compatible_graph
 
     def is_license_exist(self, license_name: str) -> bool:
@@ -65,12 +68,68 @@ class Checker:
 
         return self.properties_graph.nodes.get(license_name) is not None
 
+    def is_copyleft(self, license_name: str) -> bool:
+        """
+        Check if the license is copyleft
+
+        Args:
+            - license_name: The name of the license
+
+        Returns:
+            - True if the license is copyleft, False otherwise
+        """
+        if not self.is_license_exist(license_name):
+            raise ValueError(f"The license {license_name} does not exist")
+        for _, target, data in self.properties_graph.graph.out_edges(license_name, data=True):
+            if data.get("name") == "must" and target == "set_same_license":
+                return True
+        return False
+
+    def get_relicense(self, license_name: str, scope: Optional[Scope] = None) -> str | None:
+        """
+        Get the relicense of the license
+
+        Args:
+            - license_name: The name of the license
+            - scope: (Optional) The scope of the scenes to be used in project
+
+        Returns:
+            - The name of the relicense
+        """
+        if not self.is_license_exist(license_name):
+            raise ValueError(f"The license {license_name} does not exist")
+        for _, target, data in self.properties_graph.graph.out_edges(license_name, data=True):
+            if data.get("name") == "relicense":
+                target_scope = Scope.from_str(data.get("scope", ""))
+                if scope and scope in target_scope:
+                    return target
+        return None
+
+    def get_modal_features(self, license_name: str, modal: str) -> set[str]:
+        """
+        Get the modal features of the license
+
+        Args:
+            - license_name: The name of the license
+            - modal: The name of the modal
+
+        Returns:
+            - The modal features of the license
+        """
+        if not self.is_license_exist(license_name):
+            raise ValueError(f"The license {license_name} does not exist")
+
+        rets = set()
+        for _, target, data in self.properties_graph.graph.out_edges(license_name, data=True):
+            if data.get("name") == modal:
+                rets.add(target)
+        return rets
+
     def check_compatibility(
         self,
         license_a: str | LicenseFeat,
         license_b: str | LicenseFeat,
-        scope: Scope = None,
-        blacklist: list[str] = None,
+        scope: Scope,
     ) -> CompatibleType:
         """
         Check the compatibility between two licenses
@@ -105,10 +164,7 @@ class Checker:
         if edge_index:
             # TODO: check all edges
             edge = self.compatible_graph.get_edge_data(edge_index[0])
-            if edge["compatibility"] == CompatibleType.CONDITIONAL_COMPATIBLE:
-
-                if not scope:
-                    scope = Scope()
+            if edge and edge["compatibility"] == CompatibleType.CONDITIONAL_COMPATIBLE:
 
                 compatible_scope = Scope.from_str(edge["scope"])
 
@@ -117,7 +173,7 @@ class Checker:
 
                 return CompatibleType.INCOMPATIBLE
 
-            return CompatibleType(edge["compatibility"])
+            return CompatibleType(edge.get("compatibility", CompatibleType.UNKNOWN))
         else:
             warnings.warn(f"The compatibility of the licenses {license_a_id}->{license_b_id} is unknown")
             return CompatibleType.UNKNOWN

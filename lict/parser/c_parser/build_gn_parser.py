@@ -17,6 +17,9 @@
 #
 
 import json
+
+from typing import Optional
+
 from lict.parser.base import BaseParser
 from lict.utils.graph import GraphManager
 
@@ -30,15 +33,29 @@ class GnParser(BaseParser):
     arg_table = {
         "--gn_tool": {"type": str, "help": "the path of the gn tool in executable form", "group": "gn"},
         "--gn_file": {"type": str, "help": "the path of the gn deps graph output file", "group": "gn"},
+        "--ignore-test": {
+            "action": "store_true",
+            "help": "Ignore the test target in the GN file and parse the GN file to generate the dependency graph.",
+            "default": True,
+        },
     }
 
-    def parse(self, project_path: str, context: GraphManager = None) -> GraphManager:
+    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
+        ignore_test = getattr(self.args, "ignore_test", True)
+
+        if context is None:
+            context = GraphManager()
+
         if self.args.gn_file is not None:
             with open(file=self.args.gn_file, mode="r", encoding="UTF-8") as file:
                 gn_data = json.load(file)
                 file.close()
                 targets = gn_data["targets"]
                 for key, value in track(targets.items(), "Parsing GN file..."):
+
+                    if ignore_test and value["testonly"]:
+                        continue
+
                     if (key, value["type"]) not in self.visted:
                         vertex = self.create_vertex(key, type=value["type"])
                         context.add_node(vertex)

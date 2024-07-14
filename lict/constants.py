@@ -14,7 +14,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
+
+"""
+The constants of the project. 
+
+The constants are used to store the configurations of the project,
+and the enum types are used to define the types of the project.
+"""
 
 from enum import StrEnum, IntEnum
 
@@ -22,7 +28,7 @@ from enum import StrEnum, IntEnum
 class Settings(StrEnum):
     """configurations of the project."""
 
-    PACAKAGE_NAME = "lict"
+    PACKAGE_NAME = "lict"
     RESOURCE_NAME = "resources"
     LICENSE_PROPERTY_GRAPH = "properties_graph.gml"
     LICENSE_COMPATIBLE_GRAPH = "compatible_graph.gml"
@@ -85,3 +91,4 @@ class ScopeElement(StrEnum):
     STATIC_LINKING = "STATIC_LINKING"
     EXECUTABLE = "EXECUTABLE"
     IN_CATEGORY = "IN_CATEGORY"
+    GENERATED = "GENERATED"

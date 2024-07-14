@@ -53,13 +53,12 @@ class ScancodeParser(BaseParser):
         self.checker = Checker()
         self.spdx_parser = SPDXParser()
 
-    def add_license(self, context: GraphManager, file_path: str, spdx_results: DualLicense):
+    def add_license(self, context: GraphManager, file_path: str, spdx_results: DualLicense, test):
         parent_label = "//" + file_path.replace("\\", "/")
-
         context_node = context.nodes.get(parent_label, None)
 
         if not context_node:
-            return
+            return None
 
         if spdx_results:
             context_node["licenses"] = spdx_results
@@ -77,7 +76,7 @@ class ScancodeParser(BaseParser):
 
         return spdx_id
 
-    def parse_json(self, json_path: str, context: GraphManager) -> GraphManager:
+    def parse_json(self, json_path: str, context: GraphManager):
 
         if context is None:
             raise ValueError(f"Context can not be None in {self.__class__.__name__}.")
@@ -96,14 +95,15 @@ class ScancodeParser(BaseParser):
                         file_path = os.path.join(rel_path, match["from_file"])
                     else:
                         file_path = os.path.relpath(match["from_file"], match["from_file"].split(os.sep)[0])
+
                     spdx_results = self.spdx_parser(
                         match["license_expression_spdx"],
                         file_path,
-                        expand=True,
                         proprocessor=self.remove_ref_lang if self.args.rm_ref_lang else None,
                     )
 
-                    self.add_license(context, file_path, spdx_results)
+                    if spdx_results:
+                        self.add_license(context, file_path, spdx_results, match["license_expression_spdx"] + "_m")
 
             for file in scancode_results["files"]:
                 if rel_path:
@@ -111,15 +111,16 @@ class ScancodeParser(BaseParser):
                 else:
                     file_path = os.path.relpath(file["path"], file["path"].split(os.sep)[0])
                 if file["detected_license_expression_spdx"]:
-                    spdx_results = self.spdx_parser(file["detected_license_expression_spdx"], file_path, expand=True)
 
-                    self.add_license(context, file_path, spdx_results)
+                    spdx_results = self.spdx_parser(file["detected_license_expression_spdx"], file_path)
+
+                    self.add_license(context, file_path, spdx_results, file["detected_license_expression_spdx"] + "_f")
 
     def parse(self, project_path: str, context: GraphManager) -> GraphManager:
         """
         The path of the scancode's output is relative path, whatever you pass absolute path or relative path.
 
-        eg.
+        Usage:
         ```shell
         scancode --json-pp license.json .
         # or
