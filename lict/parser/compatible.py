@@ -215,19 +215,22 @@ class BaseCompatiblityParser(BaseParser):
         Returns:
             GraphManager: The context of the graph
         """
-
+        conflicts_table: dict[str, set[frozenset[str]]] = {}
         ignore_unk = getattr(self.args, "ignore_unk", False)
         blacklist = getattr(self.config, "blacklist", [])
 
         if not context:
             raise ValueError("The context should not be None")
 
+        count = 0
         with Progress() as progress:
             start_time = time.time()
             total_nodes = len(context.graph.nodes)
             task = progress.add_task("[red]Parsing compatibility...", total=total_nodes)
             for sub in nx.weakly_connected_components(context.graph):
-                for current_node, _, children in self.generate_processing_sequence(context.graph.subgraph(sub).copy()):
+                for current_node, parents, children in self.generate_processing_sequence(
+                    context.graph.subgraph(sub).copy()
+                ):
 
                     dual_before_check = context.nodes[current_node].get("before_check", None)
 
@@ -239,26 +242,48 @@ class BaseCompatiblityParser(BaseParser):
                         dual_before_check, blacklist=blacklist, ignore_unk=ignore_unk
                     )
 
-                    if not dual_after_check:
+                    current_licenses = context.nodes[current_node].get("licenses", None)
 
-                        uuid = str(uuid4())
-                        current_licenses = context.nodes[current_node].get("licenses", None)
-                        context.nodes[current_node]["conflict"] = {
-                            "id": uuid,
-                            "conflicts": str(set2list(conflicts)),
-                        }
+                    for parent in parents:
+                        conflict_group = context.nodes[parent].get("conflict_group", None)
+                        if conflict_group is None:
+                            continue
 
-                        if self.is_conflict_happened(current_licenses, conflicts):
-                            context.nodes[current_node]["conflict_id"] = uuid
+                        for conflict_id in conflict_group:
+                            conflict_pattern = conflicts_table.get(conflict_id, set())
 
-                        for child in children:
-                            licenses = context.nodes[child].get("outbound", None)
-                            if self.is_conflict_happened(licenses, conflicts):
-                                context.nodes[child]["conflict_id"] = uuid
+                            if current_licenses and self.is_conflict_happened(current_licenses, conflict_pattern):
+                                context.nodes[current_node]["conflict_group"] = (
+                                    context.nodes[current_node].get("conflict_group", set()).union({conflict_id})
+                                )
+
+                            if dual_after_check:
+                                continue
+
+                            new_pattern = set(filter(lambda conflict: conflict in conflict_pattern, conflicts))
+
+                            if not new_pattern:
+                                continue
+
+                            new_uuid = str(uuid4())
+                            conflicts_table[new_uuid] = new_pattern
+                            context.nodes[current_node]["conflict_group"] = (
+                                context.nodes[current_node].get("conflict_group", set()).union({new_uuid})
+                            )
+                    else:
+                        if not dual_after_check:
+                            count += 1
+                            if tuple(parents):
+                                raise ValueError("The parent should be empty", tuple(parents))
+                            uuid = str(uuid4())
+                            conflicts_table[uuid] = conflicts
+                            context.nodes[current_node]["conflict_group"] = {uuid}
 
                     progress.update(
                         task, advance=1, description=f"[red]Processing compatibility {time.time() - start_time:.2f}s"
                     )
+
+        print(f"Total conflicts pattern: {len(conflicts_table.keys())}, {count}")
 
         if output := getattr(self.args, "output", None):
             os.makedirs(output, exist_ok=True)
