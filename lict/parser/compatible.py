@@ -17,6 +17,7 @@
 #
 
 import os
+import json
 import time
 import warnings
 import argparse
@@ -215,19 +216,22 @@ class BaseCompatiblityParser(BaseParser):
         Returns:
             GraphManager: The context of the graph
         """
-
+        conflicts_table: dict[str, set[frozenset[str]]] = {}
         ignore_unk = getattr(self.args, "ignore_unk", False)
         blacklist = getattr(self.config, "blacklist", [])
 
         if not context:
             raise ValueError("The context should not be None")
 
+        count = 0
         with Progress() as progress:
             start_time = time.time()
             total_nodes = len(context.graph.nodes)
             task = progress.add_task("[red]Parsing compatibility...", total=total_nodes)
             for sub in nx.weakly_connected_components(context.graph):
-                for current_node, _, children in self.generate_processing_sequence(context.graph.subgraph(sub).copy()):
+                for current_node, parents, children in self.generate_processing_sequence(
+                    context.graph.subgraph(sub).copy()
+                ):
 
                     dual_before_check = context.nodes[current_node].get("before_check", None)
 
@@ -239,29 +243,75 @@ class BaseCompatiblityParser(BaseParser):
                         dual_before_check, blacklist=blacklist, ignore_unk=ignore_unk
                     )
 
-                    if not dual_after_check:
+                    current_outbound = context.nodes[current_node].get("outbound", None)
 
-                        uuid = str(uuid4())
-                        current_licenses = context.nodes[current_node].get("licenses", None)
-                        context.nodes[current_node]["conflict"] = {
-                            "id": uuid,
-                            "conflicts": str(set2list(conflicts)),
-                        }
+                    # if current_node == "//build/config:executable_deps":
+                    #     print(tuple(parents))
 
-                        if self.is_conflict_happened(current_licenses, conflicts):
-                            context.nodes[current_node]["conflict_id"] = uuid
+                    for parent in parents:
 
-                        for child in children:
-                            licenses = context.nodes[child].get("outbound", None)
-                            if self.is_conflict_happened(licenses, conflicts):
-                                context.nodes[child]["conflict_id"] = uuid
+                        conflict_group = context.nodes[parent].get("conflict_group", None)
+                        if conflict_group is None:
+                            continue
+
+                        for conflict_id in conflict_group:
+                            conflict_pattern = conflicts_table.get(conflict_id, set())
+
+                            if current_outbound and self.is_conflict_happened(current_outbound, conflict_pattern):
+                                context.nodes[current_node]["conflict_group"] = (
+                                    context.nodes[current_node].get("conflict_group", set()).union({conflict_id})
+                                )
+
+                            if dual_after_check:
+                                continue
+
+                            new_pattern = set(filter(lambda conflict: conflict in conflict_pattern, conflicts))
+
+                            if not new_pattern:
+                                continue
+
+                            new_uuid = str(uuid4())
+                            conflicts_table[new_uuid] = new_pattern
+                            context.nodes[current_node]["conflict_group"] = (
+                                context.nodes[current_node].get("conflict_group", set()).union({new_uuid})
+                            )
+
+                            if len(new_pattern) != len(conflict_pattern):
+                                context.nodes[current_node]["conflict_group"] = (
+                                    context.nodes[current_node].get("conflict_group", set()).union({conflict_id})
+                                )
+
+                    else:
+                        if not dual_after_check:
+                            count += 1
+                            if tuple(parents):
+                                raise ValueError("The parent should be empty", tuple(parents))
+                            uuid = str(uuid4())
+                            conflicts_table[uuid] = conflicts
+                            context.nodes[current_node]["conflict_group"] = {uuid}
 
                     progress.update(
                         task, advance=1, description=f"[red]Processing compatibility {time.time() - start_time:.2f}s"
                     )
 
+        print(f"Total conflicts pattern: {len(conflicts_table.keys())}, {count}")
+
         if output := getattr(self.args, "output", None):
             os.makedirs(output, exist_ok=True)
             context.save(output + "/compatible_checked.gml")
+            ret_results = {}
+            for node, node_data in context.nodes(data=True):
+                conflict_group = node_data.get("conflict_group", None)
+                if conflict_group and (current_licenses := node_data.get("licenses", None)):
+                    # current_licenses = context.nodes[current_node].get("licenses", None)
+                    # if current_licenses:
+                    for conflict_id in conflict_group:
+                        ret_results[conflict_id] = ret_results.get(
+                            conflict_id, {"conflicts": conflicts_table[conflict_id]}
+                        )
+                        ret_results[conflict_id]["files"] = ret_results[conflict_id].get("files", set())
+                        ret_results[conflict_id]["files"].add(node)
+            with open(output + "/results.json", "w") as f:
+                f.write(json.dumps(ret_results, default=lambda x: set2list(x) if isinstance(x, set) else x))
 
         return context
