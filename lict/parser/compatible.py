@@ -17,6 +17,7 @@
 #
 
 import os
+import json
 import time
 import warnings
 import argparse
@@ -242,9 +243,13 @@ class BaseCompatiblityParser(BaseParser):
                         dual_before_check, blacklist=blacklist, ignore_unk=ignore_unk
                     )
 
-                    current_licenses = context.nodes[current_node].get("licenses", None)
+                    current_outbound = context.nodes[current_node].get("outbound", None)
+
+                    # if current_node == "//build/config:executable_deps":
+                    #     print(tuple(parents))
 
                     for parent in parents:
+
                         conflict_group = context.nodes[parent].get("conflict_group", None)
                         if conflict_group is None:
                             continue
@@ -252,7 +257,7 @@ class BaseCompatiblityParser(BaseParser):
                         for conflict_id in conflict_group:
                             conflict_pattern = conflicts_table.get(conflict_id, set())
 
-                            if current_licenses and self.is_conflict_happened(current_licenses, conflict_pattern):
+                            if current_outbound and self.is_conflict_happened(current_outbound, conflict_pattern):
                                 context.nodes[current_node]["conflict_group"] = (
                                     context.nodes[current_node].get("conflict_group", set()).union({conflict_id})
                                 )
@@ -270,6 +275,12 @@ class BaseCompatiblityParser(BaseParser):
                             context.nodes[current_node]["conflict_group"] = (
                                 context.nodes[current_node].get("conflict_group", set()).union({new_uuid})
                             )
+
+                            if len(new_pattern) != len(conflict_pattern):
+                                context.nodes[current_node]["conflict_group"] = (
+                                    context.nodes[current_node].get("conflict_group", set()).union({conflict_id})
+                                )
+
                     else:
                         if not dual_after_check:
                             count += 1
@@ -288,5 +299,19 @@ class BaseCompatiblityParser(BaseParser):
         if output := getattr(self.args, "output", None):
             os.makedirs(output, exist_ok=True)
             context.save(output + "/compatible_checked.gml")
+            ret_results = {}
+            for node, node_data in context.nodes(data=True):
+                conflict_group = node_data.get("conflict_group", None)
+                if conflict_group and (current_licenses := node_data.get("licenses", None)):
+                    # current_licenses = context.nodes[current_node].get("licenses", None)
+                    # if current_licenses:
+                    for conflict_id in conflict_group:
+                        ret_results[conflict_id] = ret_results.get(
+                            conflict_id, {"conflicts": conflicts_table[conflict_id]}
+                        )
+                        ret_results[conflict_id]["files"] = ret_results[conflict_id].get("files", set())
+                        ret_results[conflict_id]["files"].add(node)
+            with open(output + "/results.json", "w") as f:
+                f.write(json.dumps(ret_results, default=lambda x: set2list(x) if isinstance(x, set) else x))
 
         return context
