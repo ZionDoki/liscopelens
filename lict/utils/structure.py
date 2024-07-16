@@ -26,14 +26,13 @@ import os
 import re
 import json
 import itertools
-from pathlib import Path
 from typing import Optional, Callable
 from dataclasses import dataclass, field
 
 import toml
 
 from lict.constants import ScopeToken
-from .scaffold import get_resource_path, timer
+from .scaffold import get_resource_path
 
 
 @dataclass
@@ -172,8 +171,10 @@ class Scope(dict[str, set[str]]):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for _, v in self.items():
+            if not isinstance(v, set):
+                raise TypeError("The value of a scope must be a set")
 
-    @timer
     def __and__(self, other: "Scope") -> "Scope":
         simplified_other = self._simplify(other)
         simplified_self = self._simplify(self)
@@ -195,7 +196,7 @@ class Scope(dict[str, set[str]]):
             new[k] = simplified_self[k] | simplified_other[k] | new.get(k, set())
         return self._simplify(new)
 
-    def __contains__(self, other: "Scope") -> bool:
+    def __contains__(self, other: Optional["Scope"]) -> bool:
 
         if other is None:
             if not self:
@@ -207,9 +208,13 @@ class Scope(dict[str, set[str]]):
 
         uncontains_scope = Scope({})
 
+        if simplified_other == uncontains_scope:
+            return super().__contains__(ScopeToken.UNIVERSE)
+
         for k in simplified_other:
             if simplified_self.get(k, False) is not False:
                 remains = simplified_self[k] - simplified_other[k]
+
                 if remains:
                     uncontains_scope[k] = remains
             else:
@@ -323,7 +328,7 @@ class ActionFeat:
 
     name: str
     modal: str
-    protect_scope: list
+    protect_scope: Optional[list]
     escape_scope: list
     scope: Scope = field(default_factory=Scope)
     target: list = field(default_factory=list)

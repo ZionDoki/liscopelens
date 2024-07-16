@@ -50,13 +50,13 @@ escape_scope = []
 
 [cannot.impose_further_restriction]
 protect_scope = []
-escape_scope = ["trademark"]
+escape_scope = [ "TRADEMARK",]
 
 [cannot.provide_warranty]
 protect_scope = []
 escape_scope = []
 
 [special.relicense]
-protect_scope = ["dynamic_linking"]
+protect_scope = [ "DYNAMIC_LINKING",]
 escape_scope = []
-target = ["public-domain"]
+target = [ "public-domain",]

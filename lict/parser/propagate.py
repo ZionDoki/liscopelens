@@ -26,6 +26,8 @@ from typing import Optional, Any
 import networkx as nx
 from rich.progress import Progress
 
+from lict.constants import ScopeElement
+
 from .base import BaseParser
 from lict.checker import Checker
 
