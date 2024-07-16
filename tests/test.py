@@ -1,4 +1,5 @@
 import os
+from tkinter import NO
 import unittest
 import argparse
 from lict.infer import *
@@ -91,6 +92,41 @@ class TestLicense(unittest.TestCase):
             "ActionFeat intersect failed",
         )
 
+        self.assertFalse(
+            None in Scope.universe(),
+            "None should not in universe",
+        )
+
+        self.assertFalse(
+            None in Scope({ScopeToken.UNIVERSE: set("test")}),
+            "None should not in non-strict universe",
+        )
+
+        self.assertTrue(
+            None in Scope(),
+            "None should in empty scope",
+        )
+
+        self.assertTrue(
+            Scope() in Scope.universe(),
+            "Empty set should in universe",
+        )
+
+        self.assertFalse(
+            Scope({}) in Scope({"test": set()}),
+            "Empty set should not in scope that has not Universal protect scope",
+        )
+
+        self.assertTrue(
+            Scope({"test": {"a"}}) in Scope({"test": set()}),
+            "Empty set should in scope that has Universal protect scope",
+        )
+
+        self.assertFalse(
+            Scope({"test": set()}) in Scope({"test": {"b"}}),
+            "Scope should not in different scope",
+        )
+
         result = ActionFeatOperator.intersect(ActionFeat("a", "b", [], ["b"]), ActionFeat("a", "b", [], ["b"]))
         self.assertEqual(
             result,
@@ -107,7 +143,7 @@ class TestLicense(unittest.TestCase):
 
         self.assertTrue(checker.is_license_exist("MIT"), "MIT should exist in the license graph")
 
-        self.assertAlmostEqual(
+        self.assertEqual(
             checker.check_compatibility("LGPL-2.1-only", "Apache-2.0", scope=Scope({"dynamic_linking": set()})),
             CompatibleType.CONDITIONAL_COMPATIBLE,
             "LGPL-2.1-only and Apache-2.0 should be CONDITIONAL_COMPATIBLE",
@@ -181,7 +217,9 @@ class TestParser(unittest.TestCase):
         from lict.parser.compatible import BaseCompatiblityParser
         from lict.parser.scancode import ScancodeParser
 
-        ScancodeParser(argparse.Namespace(scancode_file="../lict_exp/test.json")).parse("test", GraphManager())
+        ScancodeParser(argparse.Namespace(scancode_file="../lict_exp/test.json"), config=load_config()).parse(
+            "test", GraphManager()
+        )
 
 
 class TestTest(unittest.TestCase):
@@ -194,7 +232,7 @@ class TestTest(unittest.TestCase):
         # TestParser(argparse.Namespace(scancode_file="../lict_exp/test.json")).parse("test", GraphManager())
         config = Config.from_toml(path="lict/config/default.toml")
         context = TestParser(
-            argparse.Namespace(user_config_file="lict/config/user_config.toml", init_file="lict/resources/init.gml", results="results"),
+            argparse.Namespace(user_config_file="lict/config/user_config.toml", init_file="lict/resources/test_template.gml", results="results"),
             config=config).parse("test", GraphManager())
 
         # from lict.parser.compatible import BaseCompatiblityParser
@@ -216,7 +254,7 @@ class TempTest(unittest.TestCase):
         print(edge)
         edge = graph.get_edge_data(edge[0])
         scope = Scope.from_str(edge["scope"])
-        scope["UNIVERSAL"] = ["a", "b"]
+        scope["UNIVERSAL"] = set(["a", "b"])
         print(scope)
         print(Scope({"a": set()}))
         print(Scope({"COMPILE": set()}) in scope)

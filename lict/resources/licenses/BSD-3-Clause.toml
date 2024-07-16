@@ -1,43 +1,43 @@
 [can.private_use]
 escape_scope = []
-protect_scope = ["source_code", "binary_form"]
+protect_scope = [ "SOURCE_FORM", "BINARY_FORM",]
 
 [can.commercial_use]
 escape_scope = []
-protect_scope = ["source_code", "binary_form"]
+protect_scope = [ "SOURCE_FORM", "BINARY_FORM",]
 
 [can.distribute]
 escape_scope = []
-protect_scope = ["source_code"]
+protect_scope = [ "SOURCE_FORM",]
 
 [can.modify]
 escape_scope = []
-protect_scope = ["source_code", "binary_form"]
+protect_scope = [ "SOURCE_FORM", "BINARY_FORM",]
 
 [must.disclose_source]
 escape_scope = []
-protect_scope = ["source_code"]
+protect_scope = [ "SOURCE_FORM",]
 
 [must.include_copyright]
 escape_scope = []
-protect_scope = ["source_code", "binary_form"]
+protect_scope = [ "SOURCE_FORM", "BINARY_FORM",]
 
 [must.include_license]
 escape_scope = []
-protect_scope = ["binary_form"]
+protect_scope = [ "BINARY_FORM",]
 
 [must.include_notice]
 escape_scope = []
-protect_scope = ["source_code", "binary_form"]
+protect_scope = [ "SOURCE_FORM", "BINARY_FORM",]
 
 [must.state_changes]
 escape_scope = []
-protect_scope = ["source_code"]
+protect_scope = [ "SOURCE_FORM",]
 
 [cannot.provide_warranty]
 escape_scope = []
 protect_scope = []
 
 [cannot.use_trademark]
-protect_scope = ["trademark"]
-escape_scope = ["ask_author_for_permission"]
+protect_scope = [ "TRADEMARK",]
+escape_scope = [ "ASK_FOR_AUTH",]

@@ -13,6 +13,7 @@ __pycache__
 *.csv
 *.dot
 
+!test_template.gml
 !*/resources/*.json
 examples/ohProject
 .idea

@@ -20,7 +20,7 @@ escape_scope = []
 
 [cannot.impose_further_restriction]
 protect_scope = []
-escape_scope = ["trademark"]
+escape_scope = [ "TRADEMARK",]
 
 [cannot.provide_warranty]
 protect_scope = []
@@ -48,7 +48,7 @@ escape_scope = []
 
 [must.set_same_license]
 protect_scope = []
-escape_scope = ["written_authorization"]
+escape_scope = [ "ASK_FOR_AUTH",]
 
 [must.state_changes]
 protect_scope = []

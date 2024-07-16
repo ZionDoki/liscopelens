@@ -240,6 +240,7 @@ class TestRule:
 
     def test(self, rule, folder_name, results, usr_conflicts, license_a, license_b, blacklist):
         config = Config.from_toml(path="lict/config/default.toml")
+        config.blacklist = blacklist or []
         new_graph = node = node_a = node_b = None
         if rule == "same_component":
             new_graph, node = self.rule_same_component(license_a, license_b)

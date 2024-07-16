@@ -1,17 +1,17 @@
 [can.private_use]
-protect_scope = ["source_code", "binary_from", "derivative_work",]
+protect_scope = [ "SOURCE_FORM", "OBJECT_FORM", "DERIVED",]
 escape_scope = []
 
 [can.commercial_use]
-protect_scope = ["source_code", "binary_from", "derivative_work",]
+protect_scope = [ "SOURCE_FORM", "OBJECT_FORM", "DERIVED",]
 escape_scope = []
 
 [can.distribute]
-protect_scope = ["source_code", "binary_from", "derivative_work",]
+protect_scope = [ "SOURCE_FORM", "OBJECT_FORM", "DERIVED",]
 escape_scope = []
 
 [can.modify]
-protect_scope = ["source_code", "binary_from", "derivative_work",]
+protect_scope = [ "SOURCE_FORM", "OBJECT_FORM", "DERIVED",]
 escape_scope = []
 
 [can.patent_grant]
@@ -20,15 +20,15 @@ escape_scope = []
 
 [must.include_copyright]
 protect_scope = []
-escape_scope = ["derivative_work"]
+escape_scope = [ "DERIVED",]
 
 [must.include_license]
-protect_scope = ["source_code", "binary_from", "derivative_work",]
+protect_scope = [ "SOURCE_FORM", "OBJECT_FORM", "DERIVED",]
 escape_scope = []
 
 [must.include_notice]
 protect_scope = []
-escape_scope = ["derivative_work"]
+escape_scope = [ "DERIVED",]
 
 [must.state_changes]
 protect_scope = []
@@ -43,5 +43,5 @@ protect_scope = []
 escape_scope = []
 
 [cannot.use_trademark]
-protect_scope = ["trademark"]
+protect_scope = [ "TRADEMARK",]
 escape_scope = []

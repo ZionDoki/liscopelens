@@ -17,8 +17,8 @@ protect_scope = []
 escape_scope = []
 
 [cannot.use_trademark]
-protect_scope = ["trademark"]
-escape_scope = ["ask_author_for_permission"]
+protect_scope = [ "TRADEMARK",]
+escape_scope = [ "ASK_FOR_AUTH",]
 
 [must.include_copyright]
 protect_scope = []

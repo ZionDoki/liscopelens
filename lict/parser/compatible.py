@@ -245,9 +245,6 @@ class BaseCompatiblityParser(BaseParser):
 
                     current_outbound = context.nodes[current_node].get("outbound", None)
 
-                    # if current_node == "//build/config:executable_deps":
-                    #     print(tuple(parents))
-
                     for parent in parents:
 
                         conflict_group = context.nodes[parent].get("conflict_group", None)
@@ -303,8 +300,7 @@ class BaseCompatiblityParser(BaseParser):
             for node, node_data in context.nodes(data=True):
                 conflict_group = node_data.get("conflict_group", None)
                 if conflict_group and (current_licenses := node_data.get("licenses", None)):
-                    # current_licenses = context.nodes[current_node].get("licenses", None)
-                    # if current_licenses:
+
                     for conflict_id in conflict_group:
                         ret_results[conflict_id] = ret_results.get(
                             conflict_id, {"conflicts": conflicts_table[conflict_id]}

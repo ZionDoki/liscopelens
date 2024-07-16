@@ -19,14 +19,13 @@ protect_scope = []
 escape_scope = []
 
 [cannot.use_trademark]
-protect_scope = ["trademark"]
+protect_scope = [ "TRADEMARK",]
 escape_scope = []
 
 [cannot.provide_warranty]
 protect_scope = []
 escape_scope = []
 
-# golden example ?
 [cannot.patent_grant]
 protect_scope = []
 escape_scope = []
