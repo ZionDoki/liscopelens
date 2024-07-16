@@ -22,10 +22,6 @@ protect_scope = []
 escape_scope = []
 protect_scope = []
 
-[must.modify]
-escape_scope = []
-protect_scope = []
-
 [cannot.provide_warranty]
 escape_scope = []
 protect_scope = []
