@@ -1,0 +1,6 @@
+human_review = true
+
+[special.relicense]
+protect_scope = ["dynamic_linking", "static_linking"]
+escape_scope = []
+target = ["public-domain"]

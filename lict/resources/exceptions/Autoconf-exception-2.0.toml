@@ -1,0 +1,6 @@
+human_review = true
+
+[special.relicense]
+protect_scope = ["generated_file"]
+escape_scope = []
+target = ["public-domain"]

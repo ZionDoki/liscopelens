@@ -468,13 +468,8 @@ class GraphManager:
         target_node = self.query_node_by_label(node_label)
         if target_node:
             target_node[new_attribute] = new_value
-<<<<<<< Updated upstream
-            # ? repair for typing check
-            self.graph.add_node(node_label, **target_node)
-=======
-            # self.graph.nodes[node_label] = target_node
             nx.set_node_attributes(self.graph, {node_label: target_node})
->>>>>>> Stashed changes
+
             return self
         else:
             raise ValueError(f"Node with label '{node_label}' not found in the graph.")
