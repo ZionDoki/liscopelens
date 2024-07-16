@@ -103,7 +103,6 @@ class BaseExceptionParser(BaseParser):
 
                     if new_feat.spdx_id in visited_licenses:
                         continue
-
                     visited_licenses.add(new_feat.spdx_id)
                     new_for_infer[new_feat.spdx_id] = new_feat
 

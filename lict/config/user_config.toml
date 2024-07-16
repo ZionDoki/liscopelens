@@ -1,0 +1,274 @@
+[Pair_1]
+
+license_A ="MIT"
+license_B ="Apache-2.0"
+condition = ["brother"]
+description = ["MIT AND Apache-2.0"]
+conflicts =[]
+
+
+[Pair_2]
+
+license_A ="MIT"
+license_B ="Apache-2.0"
+condition = ["same_component"]
+description = ["MIT AND Apache-2.0"]
+conflicts =[]
+
+
+[Pair_3]
+
+license_A ="4.3BSD"
+license_B ="Apache-2.0"
+condition = ["brother"]
+description = ["4.3BSD AND Apache-2.0"]
+conflicts =[["4.3BSD","Apache-2.0"]]
+
+
+[Pair_4]
+
+license_A ="4.3BSD"
+license_B ="Apache-2.0"
+condition = ["condition"]
+description = ["4.3BSD AND Apache-2.0"]
+conflicts =[]
+
+
+[Pair_5]
+
+license_A ="4.3BSD"
+license_B ="Apache-2.0"
+condition = ["exe"]
+description = ["4.3BSD AND Apache-2.0"]
+conflicts =[]
+
+
+[Pair_6]
+
+license_A ="Apache-2.0"
+license_B ="GPL-2.0-only"
+condition = ["brother"]
+description = ["Apache-2.0  AND GPL-2.0-only"]
+conflicts =[["Apache-2.0","GPL-2.0-only"]]
+
+
+[Pair_7]
+
+license_A ="Apache-2.0"
+license_B ="GPL-2.0-only"
+condition = ["static"]
+description = ["Apache-2.0  AND GPL 2.0"]
+conflicts =[["Apache-2.0","GPL-2.0-only"]]
+
+
+[Pair_8]
+
+license_A ="Apache-2.0"
+license_B ="GPL-2.0-only"
+condition = ["same_component"]
+description = ["Apache-2.0  AND GPL 2.0"]
+conflicts =[["Apache-2.0","GPL-2.0-only"]]
+
+
+[Pair_9]
+
+license_A ="Apache-2.0"
+license_B ="LGPL-2.1-only"
+condition = ["brother"]
+description = ["Apache-2.0  AND  LGPL-2.1-only"]
+conflicts =[["Apache-2.0","LGPL-2.1-only"]]
+
+
+[Pair_10]
+
+license_A ="Apache-2.0"
+license_B ="LGPL-2.1-only"
+condition = ["same_component"]
+description = ["Apache-2.0  AND  LGPL-2.1-only"]
+conflicts =[["Apache-2.0","LGPL-2.1-only"]]
+
+
+[Pair_11]
+
+license_A ="Apache-2.0"
+license_B ="LGPL-2.1-only"
+condition = ["static"]
+description = ["Apache 2.0  AND  LGPL-2.1-only"]
+conflicts =[["Apache-2.0","LGPL-2.1-only"]]
+
+
+[Pair_12]
+
+license_A ="BSD-3-Clause"
+license_B ="GPL-2.0-only"
+condition = ["brother"]
+description = ["BSD-3-Clause  AND GPL-2.0-only"]
+conflicts =[]
+
+
+[Pair_13]
+
+license_A ="BSD-3-Clause"
+license_B ="GPL-2.0-only"
+condition = ["same_component"]
+description = ["BSD-3-Clause  AND GPL-2.0-only"]
+conflicts =[]
+
+
+[Pair_14]
+
+license_A ="BSD-3-Clause"
+license_B ="GPL-2.0-only"
+condition = ["condition"]
+description = ["BSD-3-Clause  AND GPL-2.0-only"]
+conflicts =[]
+
+
+[Pair_15]
+
+license_A ="GPL-1.0-only"
+license_B ="GPL-2.0-or-later"
+condition = ["same_component"]
+description = ["GPL-1.0-only  AND GPL-2.0-or-later"]
+conflicts =[["GPL-1.0-only","GPL-2.0-or-later"]]
+
+
+[Pair_16]
+
+license_A ="GPL-1.0-only"
+license_B ="GPL-2.0-or-later"
+condition = ["brother"]
+description = ["GPL 1.0 only  AND GPL 2.0 or later"]
+conflicts =[["GPL-1.0-only","GPL-2.0-or-later"]]
+
+
+[Pair_17]
+
+license_A ="LGPL-2.1-only"
+license_B ="GPL-2.0-only"
+condition = ["brother"]
+description = ["LGPL-2.1 AND GPL-2.0-only"]
+conflicts =[["LGPL-2.1","GPL-2.0-only"]]
+
+
+[Pair_18]
+
+license_A ="BSD-3-Clause OR GPL-2.0-only"
+license_B ="Apache-2.0"
+condition = ["brother"]
+description = ["BSD-3-Clause or GPL-2.0-onlyAND Apache-2.0"]
+conflicts =[]
+
+
+[Pair_19]
+
+license_A ="MIT AND Apache-2.0"
+license_B ="GPL-2.0-only"
+condition = ["brother"]
+description = ["MIT AND Apache-2.0  AND GPL-2.0-only"]
+conflicts =[["GPL-2.0-only", "Apache-2.0"]]
+
+
+[Pair_20]
+
+license_A ="Apache-2.0"
+license_B ="GPL-2.0-only"
+condition = ["exe"]
+description = ["Apache-2.0 AND GPL-2.0-only"]
+conflicts =[]
+
+
+[Pair_21]
+
+license_A ="Apache-2.0"
+license_B ="LGPL-2.1-only"
+condition = ["condition"]
+description = ["Apache-2.0 AND LGPL-2.1-only"]
+conflicts =[]
+
+
+[Pair_22]
+
+license_A ="BSD-4-Clause"
+license_B ="GPL-2.0-only"
+condition = ["condition"]
+description = ["BSD-4-Clause AND GPL-2.0-only"]
+conflicts =[]
+
+
+[Pair_23]
+
+license_A ="Apache-2.0"
+license_B ="GPL-2.0-only WITH LLVM-exception"
+condition = ["brother"]
+description = ["Apache-2.0 AND GPL-2.0-only with LLVM exception"]
+conflicts =[]
+
+
+[Pair_24]
+
+license_A ="Apache-2.0"
+license_B ="GPL-2.0-only WITH Linux-syscall-note"
+condition = ["brother"]
+description = ["Apache-2.0 AND  GPL 2.0 with Linux-syscall note"]
+conflicts =[]
+
+[Pair_25]
+
+license_A ="Apache-2.0"
+license_B ="GPL-2.0-only WITH Autoconf-exception-2.0"
+condition = ["brother"]
+description = ["Apache 2.0 AND  GPL 2.0 with Autoconf-exception-2.0"]
+conflicts =[]
+
+
+[Pair_26]
+
+license_A ="Apache-2.0"
+license_B ="GPL-2.0-only WITH Bison-exception-2.2"
+condition = ["brother"]
+description = ["Apache-2.0 AND  GPL-2.0-only with Bison-exception-2.2"]
+conflicts =[]
+
+[Pair_27]
+
+license_A ="Apache-2.0"
+license_B ="GPL-2.0-or-later"
+condition = ["brother"]
+description = ["Apache-2.0 AND GPL-2.0-or-later"]
+conflicts =[]
+
+[Pair_28]
+
+license_A ="MIT AND Apache-2.0"
+license_B =""
+condition = ["same_component"]
+description = ["MIT AND Apache-2.0 choose one"]
+conflicts =[]
+
+[Pair_29]
+
+license_A ="BSD-3-Clause OR GPL-2.0-only"
+license_B ="Apache-2.0"
+condition = ["same_component"]
+description = ["BSD-3-Clause OR GPL-2.0-only and Apache-2.0"]
+conflicts =[]
+
+
+[Pair_30]
+
+license_A ="Apache-2.0"
+license_B ="GPL-2.0-or-later"
+condition = ["same_component"]
+description = ["Apache-2.0 AND GPL-2.0-or-later"]
+conflicts = []
+
+
+[Pair_31]
+
+license_A ="Apache-2.0"
+license_B ="GPL-2.0-or-later"
+condition = ["same_component"]
+description = ["Apache-2.0 AND GPL-2.0-or-later"]
+conflicts = [["Apache-2.0","GPL-2.0-or-later"]]
+blacklist = ["GPL-3.0-only"]

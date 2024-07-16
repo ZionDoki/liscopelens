@@ -12,7 +12,6 @@ class TestLicense(unittest.TestCase):
     """unit test for every model in license-tool"""
 
     def test_utils_licenses(self):
-
         schemas = load_schemas()
 
         # ! check emptyset negate in scope
@@ -115,7 +114,6 @@ class TestLicense(unittest.TestCase):
         )
 
     def test_structure(self):
-
         # load licenses
 
         checker = Checker()
@@ -179,12 +177,29 @@ class TestInfer(unittest.TestCase):
 class TestParser(unittest.TestCase):
 
     def test_compatible_parser(self):
-
         import json
         from lict.parser.compatible import BaseCompatiblityParser
         from lict.parser.scancode import ScancodeParser
 
         ScancodeParser(argparse.Namespace(scancode_file="../lict_exp/test.json")).parse("test", GraphManager())
+
+
+class TestTest(unittest.TestCase):
+    import warnings
+    warnings.filterwarnings("ignore")
+
+    def test_Test_parser(self):
+        from lict.parser.Test_parser.Test_parser import TestParser
+
+        # TestParser(argparse.Namespace(scancode_file="../lict_exp/test.json")).parse("test", GraphManager())
+        config = Config.from_toml(path="lict/config/default.toml")
+        context = TestParser(
+            argparse.Namespace(user_config_file="lict/config/user_config.toml", init_file="lict/resources/init.gml", results="results"),
+            config=config).parse("test", GraphManager())
+
+        # from lict.parser.compatible import BaseCompatiblityParser
+        # context = BaseCompatiblityParser(argparse.Namespace(),config=config).parse("test",context)
+        # context.save("answer.gml")
 
 
 class TempTest(unittest.TestCase):
