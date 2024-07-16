@@ -283,7 +283,7 @@ class ExceptRelicenseRule(CompatibleRule):
 
                 for edge_index in condition_edges:
                     origin_edge = graph.get_edge_data(edge_index)
-                    origin_scope = Scope(json.loads(origin_edge["scope"]))
+                    origin_scope = Scope.from_str(origin_edge["scope"])
 
                     new_compatible_scope = origin_scope & license_a.special["relicense"].scope
                     if not new_compatible_scope:

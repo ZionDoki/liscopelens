@@ -673,7 +673,7 @@ class SPDXParser:
 
     def __call__(self, expression, filepath: Optional[str] = None, proprocessor: Optional[Callable] = None):
         if not expression:
-            return DualLicense([])
+            return DualLicense([frozenset()])
         self.expression = expression
         self.filepath = filepath
         self.tokens = []

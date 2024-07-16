@@ -268,7 +268,7 @@ class BasePropagateParser(BaseParser):
                 if not self.checker.is_license_exist(lic.unit_spdx):
                     continue
 
-                if lic["condition"] in self.config.license_isolations:
+                if lic["condition"] in self.config.license_isolations or condition in self.config.license_isolations:
                     continue
 
                 relicense_id = self.checker.get_relicense(lic.unit_spdx, scope=Scope({lic["condition"]: set()}))
@@ -281,6 +281,9 @@ class BasePropagateParser(BaseParser):
 
                 # * when the license is not copyleft, we need to check current component condition whether is in the permissive_spreads
                 elif condition in self.config.permissive_spreads or default_spread:
+                    new_group.add(DualUnit(lic["spdx_id"], condition, lic["exceptions"]))
+
+                elif condition == None:
                     new_group.add(DualUnit(lic["spdx_id"], condition, lic["exceptions"]))
 
             if new_group:
@@ -341,7 +344,7 @@ class BasePropagateParser(BaseParser):
                         continue
 
                     context.nodes[current_node]["before_check"] = current_outbound
-                    current_outbound = current_outbound.add_condition(current_condition)
+                    # current_outbound = current_outbound.add_condition(current_condition)
                     outbound = self.get_outbound(current_outbound, current_condition)
                     context.nodes[current_node]["outbound"] = outbound
 

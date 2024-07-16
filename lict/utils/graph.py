@@ -20,7 +20,9 @@
 TODO: need write ut for this module @Zihao
 """
 
+from optparse import Option
 import os
+from pickle import NONE
 import warnings
 from collections import defaultdict
 from typing import Iterator, Optional, MutableMapping, Mapping
@@ -180,15 +182,15 @@ class GraphManager:
         """depth first search the graph."""
         return nx.dfs_tree(self.graph)
 
-    def successors(self, node: str):
+    def successors(self, node: str) -> str:
         """get the successors of the node."""
         return self.graph.successors(node)
 
-    def predecessors(self, node: str):
+    def predecessors(self, node: str) -> str:
         """get the predecessors of the node."""
         return self.graph.predecessors(node)
 
-    def get_ancestors(self, node, depth):
+    def get_ancestors(self, node, depth) -> list[str]:
         current_level_nodes = [node]
         ancestors = []
 
@@ -225,6 +227,12 @@ class GraphManager:
 
         side effect: update the key of edge object with the key in the graph object
         """
+
+        # 假设 self.graph.edges 返回图中所有边的列表
+
+        if self.query_edge_by_label(**edge):
+            return
+
         key = self.graph.add_edge(**edge)
         edge.update({"key": key})
 
@@ -474,7 +482,7 @@ class GraphManager:
         else:
             raise ValueError(f"Node with label '{node_label}' not found in the graph.")
 
-    def get_subgraph_depth(self, start_node=None, depth=2, leaf_flag=True):
+    def get_subgraph_depth(self, start_node: Optional[str] = None, depth=2, leaf_flag=True):
         """
         Get a subgraph with a specified depth from the start node.
 
@@ -487,7 +495,7 @@ class GraphManager:
             GraphManager: The subgraph with the specified depth.
         """
         if leaf_flag is False:
-            nodes_to_visit = [start_node]
+            nodes_to_visit: list[str] = [start_node] if start_node else self.root_nodes
             visited_nodes = set()
             current_depth = 0
 
@@ -499,7 +507,7 @@ class GraphManager:
                         next_nodes.extend(self.successors(node))
                 nodes_to_visit = next_nodes
                 current_depth += 1
-            print(visited_nodes)
+            # print(visited_nodes)
             new_graph = GraphManager()
             new_graph.graph = self.graph.subgraph(visited_nodes)
             return new_graph
@@ -508,14 +516,13 @@ class GraphManager:
             for node in self.graph.nodes:
                 if self.graph.out_degree(node) == 0:
                     n = self.query_node_by_label(node)
-                    if n["type"] == "code":
+                    if n and n["type"] == "code":
                         leaf_nodes.append(node)
             context_list = []
             for leaf in leaf_nodes:
                 ancestors = self.get_ancestors(leaf, 2)
                 if ancestors:
-                    start_node = ancestors[0]
-                    nodes_to_visit = [start_node]
+                    nodes_to_visit = [ancestors[0]]
                     visited_nodes = set()
                     current_depth = 0
 
