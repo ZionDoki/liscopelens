@@ -21,11 +21,9 @@ Checker and Rules for license itself compatible inference
 Inferring compatibility based on structured information
 """
 
-import json
 import itertools
 
 from abc import ABC, abstractmethod
-from re import S
 from typing import Dict, Type, Optional, Callable
 from copy import deepcopy
 

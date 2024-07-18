@@ -16,7 +16,6 @@
 # limitations under the License.
 #
 
-import nntplib
 import os
 import json
 import time
@@ -24,8 +23,8 @@ import warnings
 import argparse
 import itertools
 from uuid import uuid4
+from typing import Generator, Optional
 
-from typing import Generator, Iterator, Optional
 import networkx as nx
 from rich.progress import Progress
 
