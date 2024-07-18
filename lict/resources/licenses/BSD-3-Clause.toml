@@ -1,3 +1,5 @@
+human_review = true
+
 [can.private_use]
 escape_scope = []
 protect_scope = [ "SOURCE_FORM", "BINARY_FORM",]

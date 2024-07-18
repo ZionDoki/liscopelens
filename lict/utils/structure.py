@@ -333,6 +333,27 @@ class ActionFeat:
     scope: Scope = field(default_factory=Scope)
     target: list = field(default_factory=list)
 
+    @classmethod
+    def factory(
+        cls,
+        name: str,
+        modal: str,
+        protect_scope: Optional[list] = None,
+        escape_scope: Optional[list] = None,
+        scope: Optional[Scope] = None,
+        target: Optional[list] = None,
+    ):
+        if escape_scope is None:
+            escape_scope = []
+
+        if scope is None:
+            scope = Scope()
+
+        if target is None:
+            target = []
+
+        return cls(name, modal, protect_scope, escape_scope, scope, target)
+
     def __post_init__(self):
 
         if self.protect_scope is None:

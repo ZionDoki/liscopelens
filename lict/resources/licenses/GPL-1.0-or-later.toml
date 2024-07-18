@@ -53,8 +53,3 @@ escape_scope = [ "TRADEMARK",]
 [cannot.provide_warranty]
 escape_scope = []
 protect_scope = []
-
-[special.relicense]
-protect_scope = []
-escape_scope = []
-target = [ "GPL-3.0-only", "GPL-2.0-only", "GPL-2.0-or-later", "GPL-3.0-or-later",]

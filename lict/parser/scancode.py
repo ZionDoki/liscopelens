@@ -62,6 +62,7 @@ class ScancodeParser(BaseParser):
 
         if spdx_results:
             context_node["licenses"] = spdx_results
+            context_node["test"] = test
 
     def remove_ref_lang(self, spdx_id: str) -> str:
 

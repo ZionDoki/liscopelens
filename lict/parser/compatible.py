@@ -16,6 +16,7 @@
 # limitations under the License.
 #
 
+import nntplib
 import os
 import json
 import time
@@ -24,7 +25,7 @@ import argparse
 import itertools
 from uuid import uuid4
 
-from typing import Generator, Optional
+from typing import Generator, Iterator, Optional
 import networkx as nx
 from rich.progress import Progress
 
@@ -49,7 +50,7 @@ class BaseCompatiblityParser(BaseParser):
         self.checker = Checker()
 
     def topological_traversal(self, graph: nx.DiGraph) -> Generator[str, None, None]:
-        """Topological sort the graph"""
+        """Topological sort the graph."""
         return nx.topological_sort(graph)
 
     def generate_processing_sequence(self, graph):
@@ -223,7 +224,6 @@ class BaseCompatiblityParser(BaseParser):
         if not context:
             raise ValueError("The context should not be None")
 
-        count = 0
         with Progress() as progress:
             start_time = time.time()
             total_nodes = len(context.graph.nodes)
@@ -245,12 +245,16 @@ class BaseCompatiblityParser(BaseParser):
 
                     current_outbound = context.nodes[current_node].get("outbound", None)
 
+                    new_pattern_flag, parent_conflict_flag = True, False
+                    new_pattern = conflicts.copy()
+
                     for parent in parents:
 
                         conflict_group = context.nodes[parent].get("conflict_group", None)
                         if conflict_group is None:
                             continue
 
+                        parent_conflict_flag = True
                         for conflict_id in conflict_group:
                             conflict_pattern = conflicts_table.get(conflict_id, set())
 
@@ -262,36 +266,48 @@ class BaseCompatiblityParser(BaseParser):
                             if dual_after_check:
                                 continue
 
-                            new_pattern = set(filter(lambda conflict: conflict in conflict_pattern, conflicts))
+                            new_pattern = set(filter(lambda conflict: conflict not in conflict_pattern, conflicts))
 
-                            if not new_pattern:
-                                continue
-
-                            new_uuid = str(uuid4())
-                            conflicts_table[new_uuid] = new_pattern
-                            context.nodes[current_node]["conflict_group"] = (
-                                context.nodes[current_node].get("conflict_group", set()).union({new_uuid})
-                            )
-
-                            if len(new_pattern) != len(conflict_pattern):
+                            if len(new_pattern) != len(conflicts):
                                 context.nodes[current_node]["conflict_group"] = (
                                     context.nodes[current_node].get("conflict_group", set()).union({conflict_id})
                                 )
 
-                    else:
-                        if not dual_after_check:
-                            count += 1
-                            if tuple(parents):
-                                raise ValueError("The parent should be empty", tuple(parents))
-                            uuid = str(uuid4())
-                            conflicts_table[uuid] = conflicts
-                            context.nodes[current_node]["conflict_group"] = {uuid}
+                            if not new_pattern:
+                                new_pattern_flag = False
+
+                    if dual_after_check:
+                        progress.update(task, advance=1)
+                        continue
+
+                    if not parent_conflict_flag:
+
+                        uuid = str(uuid4())
+                        for conflict_id in conflicts_table:
+                            if conflicts == conflicts_table[conflict_id]:
+                                uuid = conflict_id
+                                break
+
+                        conflicts_table[uuid] = conflicts
+                        context.nodes[current_node]["conflict_group"] = {uuid}
+                        context.nodes[current_node]["first"] = True
+
+                    elif new_pattern_flag:
+
+                        uuid = str(uuid4())
+                        for conflict_id in conflicts_table:
+                            if new_pattern == conflicts_table[conflict_id]:
+                                uuid = conflict_id
+                                break
+
+                        conflicts_table[uuid] = new_pattern
+                        context.nodes[current_node]["conflict_group"] = (
+                            context.nodes[current_node].get("conflict_group", set({})).union({uuid})
+                        )
 
                     progress.update(
                         task, advance=1, description=f"[red]Processing compatibility {time.time() - start_time:.2f}s"
                     )
-
-        print(f"Total conflicts pattern: {len(conflicts_table.keys())}, {count}")
 
         if output := getattr(self.args, "output", None):
             os.makedirs(output, exist_ok=True)
@@ -299,15 +315,26 @@ class BaseCompatiblityParser(BaseParser):
             ret_results = {}
             for node, node_data in context.nodes(data=True):
                 conflict_group = node_data.get("conflict_group", None)
-                if conflict_group and (current_licenses := node_data.get("licenses", None)):
+                if not (
+                    conflict_group
+                    and (current_licenses := node_data.get("licenses", None))
+                    and (outbound := node_data.get("outbound", None))
+                ):
+                    continue
 
-                    for conflict_id in conflict_group:
-                        ret_results[conflict_id] = ret_results.get(
-                            conflict_id, {"conflicts": conflicts_table[conflict_id]}
-                        )
-                        ret_results[conflict_id]["files"] = ret_results[conflict_id].get("files", set())
-                        ret_results[conflict_id]["files"].add(node)
+                for conflict_id in conflict_group:
+                    ret_results[conflict_id] = ret_results.get(conflict_id, {"conflicts": conflicts_table[conflict_id]})
+
+                    for lic in itertools.chain(*conflicts_table[conflict_id]):
+                        if lic not in [lic.unit_spdx for lic in itertools.chain(*current_licenses)]:
+                            continue
+
+                        if lic not in [lic.unit_spdx for lic in itertools.chain(*outbound)]:
+                            continue
+
+                        ret_results[conflict_id][lic] = ret_results[conflict_id].get(lic, set()).union({node})
+
             with open(output + "/results.json", "w") as f:
-                f.write(json.dumps(ret_results, default=lambda x: set2list(x) if isinstance(x, set) else x))
+                f.write(json.dumps(ret_results, default=lambda x: set2list(x) if isinstance(x, set) else x, indent=4))
 
         return context

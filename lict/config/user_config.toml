@@ -211,7 +211,7 @@ conflicts = []
 license_A = "Apache-2.0"
 license_B = "GPL-2.0-only WITH Linux-syscall-note"
 condition = ["brother"]
-description = ["Apache-2.0 AND  GPL 2.0 with Linux-syscall note"]
+description = ["Apache-2.0 AND  GPL 2.0 with Linux-syscall-note"]
 conflicts = []
 
 [Pair_25]
