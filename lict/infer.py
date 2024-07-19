@@ -21,7 +21,6 @@ Checker and Rules for license itself compatible inference
 Inferring compatibility based on structured information
 """
 
-import json
 import itertools
 
 from abc import ABC, abstractmethod
@@ -314,6 +313,25 @@ class OrLaterRelicenseRule(CompatibleRule):
     def get_normalized_version(self, spdx_id: str) -> list[int]:
         return normalize_version(extract_version(spdx_id) or "")
 
+    def rm_existed_edges(
+        self,
+        graph: GraphManager,
+        license_a: LicenseFeat,
+        license_b: LicenseFeat,
+        compatibility: CompatibleType,
+        bi_direct: bool = False,
+    ):
+        origin_edges = graph.query_edge_by_label(license_a.spdx_id, license_b.spdx_id, compatibility=compatibility)
+
+        for edge_index in origin_edges:
+            graph.remove_edge(edge_index)
+
+        if bi_direct:
+            origin_edges = graph.query_edge_by_label(license_b.spdx_id, license_a.spdx_id, compatibility=compatibility)
+
+            for edge_index in origin_edges:
+                graph.remove_edge(edge_index)
+
     def callback(
         self, licenses: dict[str, LicenseFeat], graph: GraphManager, license_a: LicenseFeat, license_b: LicenseFeat
     ) -> None:
@@ -330,7 +348,18 @@ class OrLaterRelicenseRule(CompatibleRule):
         if is_compatible:
             return
 
+        later_licenses = tuple(later_licenses)
         for tgt in later_licenses:
+
+            if tgt == license_b.spdx_id:
+
+                self.rm_existed_edges(graph, license_a, license_b, CompatibleType.INCOMPATIBLE, True)
+                edge = self.new_edge(license_a, license_b, compatibility=CompatibleType.UNCONDITIONAL_COMPATIBLE)
+                graph.add_edge(edge)
+                edge = self.new_edge(license_b, license_a, compatibility=CompatibleType.UNCONDITIONAL_COMPATIBLE)
+                graph.add_edge(edge)
+                continue
+
             for a, b in (tgt, license_b.spdx_id), (license_b.spdx_id, tgt):
 
                 is_compatible = graph.query_edge_by_label(a, b, compatibility=CompatibleType.UNCONDITIONAL_COMPATIBLE)
@@ -392,7 +421,7 @@ class ComplianceRequirementRule(CompatibleRule):
 
             for trigger in license_a.special["triggering"].target:
                 modal, action = trigger.split(".")
-                getattr(new_license_a, modal)[action] = ActionFeat(action, modal, [], [])
+                getattr(new_license_a, modal)[action] = ActionFeat.factory(action, modal, [], [])
 
         else:
             new_license_a = license_a

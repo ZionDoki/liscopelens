@@ -20,9 +20,7 @@
 TODO: need write ut for this module @Zihao
 """
 
-from optparse import Option
 import os
-from pickle import NONE
 import warnings
 from collections import defaultdict
 from typing import Iterator, Optional, MutableMapping, Mapping
