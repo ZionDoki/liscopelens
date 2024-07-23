@@ -269,7 +269,10 @@ class BasePropagateParser(BaseParser):
                 if lic["condition"] in self.config.license_isolations or condition in self.config.license_isolations:
                     continue
 
-                relicense_id = self.checker.get_relicense(lic.unit_spdx, scope=Scope({lic["condition"]: set()}))
+                relicense_id = self.checker.get_relicense(lic.unit_spdx, scope=Scope({condition: set()}))
+
+                # if "LGPL" in lic.unit_spdx:
+                #     print(relicense_id, lic["condition"])
 
                 if relicense_id == "public-domain":
                     continue

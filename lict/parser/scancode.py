@@ -52,17 +52,17 @@ class ScancodeParser(BaseParser):
         super().__init__(args, config)
         self.checker = Checker()
         self.spdx_parser = SPDXParser()
+        self.count = set()
 
     def add_license(self, context: GraphManager, file_path: str, spdx_results: DualLicense, test):
         parent_label = "//" + file_path.replace("\\", "/")
+
         context_node = context.nodes.get(parent_label, None)
 
-        if not context_node:
-            return None
-
-        if spdx_results:
+        if context_node and spdx_results:
             context_node["licenses"] = spdx_results
             context_node["test"] = test
+            self.count.add(parent_label)
 
     def remove_ref_lang(self, spdx_id: str) -> str:
 
@@ -143,6 +143,15 @@ class ScancodeParser(BaseParser):
                 for file in files:
                     if file.endswith(".json"):
                         self.parse_json(os.path.join(root, file), context)
+
+            json.dump(
+                list(
+                    set(node[0] for node in context.nodes(data=True) if node[1].get("type", None) == "code")
+                    - self.count
+                ),
+                open("scancode.json", "w"),
+            )
+
             return context
         else:
             raise ValueError("The path of the scancode's output is not provided.")

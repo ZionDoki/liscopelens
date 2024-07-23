@@ -141,14 +141,17 @@ class BaseCompatiblityParser(BaseParser):
             if group not in new_dual_lic:
                 continue
 
+            rm_flag = False
             for lic in group:
                 if frozenset((lic,)) in conflicts:
-                    new_dual_lic.remove(group)
-                    continue
+                    rm_flag = True
 
                 if lic.unit_spdx in blacklist:
                     conflicts.add(frozenset((lic.unit_spdx,)))
-                    new_dual_lic.remove(group)
+                    rm_flag = True
+
+            if rm_flag:
+                new_dual_lic.remove(group)
 
         for group in dual_lic:
 
