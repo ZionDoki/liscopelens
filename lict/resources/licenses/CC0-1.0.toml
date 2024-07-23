@@ -1,7 +1,5 @@
 human_review = false
 
-[must]
-
 [can.commercial_use]
 protect_scope = []
 escape_scope = []

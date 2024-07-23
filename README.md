@@ -276,7 +276,8 @@ gn依赖图格式如下
 
 ## 已知问题
 
-1. `poetry install` 无响应或者报错提示包括 `Failed to unlock the collection`.
+1. `poetry install | add` 无响应或者报错提示包括 `Failed to unlock the collection`.
+
 
 ```shell
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
