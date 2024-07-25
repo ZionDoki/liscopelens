@@ -57,7 +57,7 @@ class TestRule:
         for node in self.graph.nodes:
             if self.graph.graph.out_degree(node) == 0:
                 n = self.graph.query_node_by_label(node)
-                if n["type"] == "code":
+                if n and n["type"] == "code":
                     n["licenses"] = spdx(license_a) & spdx(license_b)
                     nx.set_node_attributes(self.graph.graph, {node: n})
                     an_node = node
@@ -255,21 +255,21 @@ class TestRule:
 
         if nx.is_frozen(new_graph.graph):
             new_graph.graph = new_graph.graph.copy()
-        an = BaseExceptionParser(argparse.Namespace(blacklist=blacklist), config=config).parse("test",
-                                                                                               new_graph)
+        an = BaseExceptionParser(argparse.Namespace(blacklist=blacklist), config=config).parse("test", new_graph)
         an = BasePropagateParser(argparse.Namespace(), config=config).parse("test", an)
-        an = BaseCompatiblityParser(argparse.Namespace(output=f"results/{folder_name}/"), config=config).parse("test",
-                                                                                                               an)
+        an = BaseCompatiblityParser(argparse.Namespace(output=f"results/{folder_name}/"), config=config).parse(
+            "test", an
+        )
         an.save(f"{results}/{folder_name}/graph_rule_an_{rule}.gml")
 
-        with open(f'{results}/{folder_name}/results.json', 'r', encoding='utf-8') as file:
+        with open(f"{results}/{folder_name}/results.json", "r", encoding="utf-8") as file:
             results = json.load(file)
         files_set = []
         conflicts = []
         for key, value in results.items():
-            if 'files' in value:
-                files_set.append(value['files'])
-            if 'conflicts' in value:
+            if "files" in value:
+                files_set.append(value["files"])
+            if "conflicts" in value:
                 conflicts.append(value["conflicts"])
         unique_conflicts = []
         for i in conflicts:
@@ -359,17 +359,18 @@ class TestParser(BaseParser):
                 os.makedirs(f"{self.args.results}/{folder_name}")
             except FileExistsError:
                 pass
-            license_a = value['license_A']
-            license_b = value['license_B']
-            condition = value['condition']
-            conflicts = value['conflicts']
-            blacklist = value.get('blacklist', None)
+            license_a = value["license_A"]
+            license_b = value["license_B"]
+            condition = value["condition"]
+            conflicts = value["conflicts"]
+            blacklist = value.get("blacklist", None)
             if "same_component" in condition:
                 subgraph = GraphManager(self.args.init_file)
                 subgraph.graph = subgraph.graph.copy()
                 test = TestRule(subgraph)
-                flag = test.test("same_component", folder_name, self.args.results, conflicts, license_a, license_b,
-                                 blacklist)
+                flag = test.test(
+                    "same_component", folder_name, self.args.results, conflicts, license_a, license_b, blacklist
+                )
                 if not flag:
                     print(f"\033[91m{folder_name}在same_component判断错误\033[0m")
             if "static" in condition:
@@ -385,8 +386,9 @@ class TestParser(BaseParser):
                 subgraph.graph = subgraph.graph.copy()
                 test = TestRule(subgraph)
 
-                flag = test.test("condition", folder_name, self.args.results, conflicts, license_a, license_b,
-                                 blacklist)
+                flag = test.test(
+                    "condition", folder_name, self.args.results, conflicts, license_a, license_b, blacklist
+                )
                 if not flag:
                     print(f"\033[91m{folder_name}在condition判断错误\033[0m")
             if "exe" in condition:

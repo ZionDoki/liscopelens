@@ -41,7 +41,7 @@ class Checker:
         if Checker._initialized:
             return
 
-        self.infer = generate_knowledge_graph()
+        self.infer = generate_knowledge_graph(reinfer=True)
         Checker._initialized = True
 
     @property
