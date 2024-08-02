@@ -252,6 +252,10 @@ class BaseCompatiblityParser(BaseParser):
 
                     for parent in parents:
 
+                        # _ current node has no outbound, then break
+                        if not current_outbound:
+                            break
+
                         conflict_group = context.nodes[parent].get("conflict_group", None)
                         if conflict_group is None:
                             continue
@@ -260,7 +264,8 @@ class BaseCompatiblityParser(BaseParser):
                         for conflict_id in conflict_group:
                             conflict_pattern = conflicts_table.get(conflict_id, set())
 
-                            if current_outbound and self.is_conflict_happened(current_outbound, conflict_pattern):
+                            # _ here to check if current node has contribution to the conflict then add conflict_id to it
+                            if self.is_conflict_happened(current_outbound, conflict_pattern):
                                 context.nodes[current_node]["conflict_group"] = (
                                     context.nodes[current_node].get("conflict_group", set()).union({conflict_id})
                                 )

@@ -286,6 +286,9 @@ class BasePropagateParser(BaseParser):
 
             if new_group:
                 new.add(frozenset(new_group))
+            else:
+                # _ Give preference to groups without outbound licenses
+                return DualLicense([])
 
         # ! when only calculate the propagation of the licenses, filter stricter licenses will cause unepxected result
         # return self.get_strict_outbound(new, reverse=True)
