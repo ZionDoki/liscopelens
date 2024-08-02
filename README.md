@@ -87,6 +87,14 @@ options:
                         配置文件路径
 ```
 
+### 审查结果
+
+```shell
+lict query /path/to/output_dir
+```
+
+![query演示](assets/example.gif)
+
 ### 基于sbom文件分析兼容性
 
 目前仅支持OH SBOM文件，文件应符合如下格式
