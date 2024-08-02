@@ -93,7 +93,7 @@ options:
 lict query /path/to/output_dir
 ```
 
-[query演示](assets/example.gif)
+![query演示](assets/example.gif)
 
 ### 基于sbom文件分析兼容性
 
