@@ -651,6 +651,28 @@ class DualLicense(set[frozenset[DualUnit]]):
             new.add(frozenset(new_group))
         return new
 
+    def has_license(self, spdx_id: str) -> bool:
+        """
+        Check if the DualLicense contains a license.
+
+        Usage:
+            ```python
+            dual_license = DualLicense.from_list([
+                [DualUnit("MIT"), DualUnit("GPL-3.0")],
+                [DualUnit("MIT"), DualUnit("GPL-3.0", condition="WITH", exceptions=["GPL-3.0-exception"])]
+            ])
+            print(dual_license.has_license("MIT"))
+            # Output: True
+            ```
+
+        Args:
+            spdx_id: str, SPDX ID of the license
+
+        Returns:
+            bool: True if the license is in the DualLicense, otherwise False
+        """
+        return any(spdx_id in [unit.unit_spdx for unit in group] for group in self)
+
     @staticmethod
     def merge_group(set1: set[DualUnit], set2: set[DualUnit]) -> set[DualUnit]:
         """

@@ -17,13 +17,14 @@
 #
 
 
+import itertools
 import os
 import json
 
 import networkx as nx
 from textual.app import App, ComposeResult
-from textual.widgets import Input, ListView, ListItem, Label
-
+from textual.widgets import Input, ListView, ListItem, Label, Button
+from textual.containers import Vertical, Horizontal
 from argparse import Namespace
 from typing import Optional
 from lict.utils.structure import Config
@@ -41,28 +42,61 @@ class GraphVisualizer(App):
         self.current_node = ""
         self.predecessors = []
         self.successors = []
-        self.conflict_uuid = ""
+        self.lic_input = ""
+        self.filter_input = ""
+        self.search_input = ""
 
     def compose(self) -> ComposeResult:
         yield Label("Search for node: ")
-        yield Input(placeholder="Enter node label to search...", id="search_input")
+        with Horizontal():
+            yield Input(placeholder="Enter node label to search...", id="search_input")
+            yield Button("X", id="clear_search_input")
         yield Label("add conflict uuid: ")
-        yield Input(placeholder="Enter conlict uuid to filter search...", id="filter_input")
+        with Horizontal():
+            yield Input(placeholder="Enter conlict uuid to filter search...", id="filter_input")
+            yield Button("X", id="clear_filter_input")
+        yield Label("add conflict license: ")
+        with Horizontal():
+            yield Input(placeholder="Enter conlict license to filter search...", id="lic_input")
+            yield Button("X", id="clear_lic_input")
         yield Label("Predecessors")
+       
         yield ListView(id="predecessors")
-        yield Label("Current Node: ", id="node_label")
+        with Horizontal():
+            yield Label("Current Node: ", id="node_label")
+            yield Button("Select", id="select")
         yield Label(id="node_data")  # 替换 Label 为 TextArea
         yield Label("Successors")
         yield ListView(id="successors")
+
+    def on_button_pressed(self, event):
+
+        if event.button.id == "select":
+            self.search_input = self.current_node
+            the_input = self.query_one("#search_input")
+            if isinstance(the_input, Input):
+                the_input.value = self.current_node
+            return
+
+        the_input = self.query_one("#" + event.button.id.replace("clear_", ""))
+        if isinstance(the_input, Input):
+            the_input.clear()
+            setattr(self, event.button.id.replace("clear_", ""), "")
+            self.search_node(self.search_input)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         query = event.value
 
         if event.control.id == "search_input" and query:
-            self.search_node(query)
+            self.search_input = query
 
         if event.control.id == "filter_input" and query:
-            self.conflict_uuid = event.value
+            self.filter_input = event.value
+
+        if event.control.id == "lic_input" and query:
+            self.lic_input = event.value
+
+        self.search_node(self.search_input)
 
     def search_node(self, label):
         for node, data in self.graph.nodes(data=True):
@@ -86,21 +120,34 @@ class GraphVisualizer(App):
         if isinstance(label_widget, Label):
             label_widget.update("Current Node: " + self.current_node)
 
-        if self.conflict_uuid == "":
-            self.successors = list(self.graph.successors(self.current_node))
-            self.predecessors = list(self.graph.predecessors(self.current_node))
-        else:
+        self.successors = list(self.graph.successors(self.current_node))
+        self.predecessors = list(self.graph.predecessors(self.current_node))
+
+        if not self.filter_input == "":
             self.predecessors = list(
                 item
-                for item in self.graph.predecessors(self.current_node)
-                if (cg := self.graph.nodes[item].get("conflict_group")) and self.conflict_uuid in cg
+                for item in self.predecessors
+                if ((cg := self.graph.nodes[item].get("conflict_group")) and self.filter_input in cg)
             )
 
             self.successors = list(
                 item
-                for item in self.graph.successors(self.current_node)
-                if (cg := self.graph.nodes[item].get("conflict_group")) and self.conflict_uuid in cg
+                for item in self.successors
+                if ((cg := self.graph.nodes[item].get("conflict_group")) and self.filter_input in cg)
             )
+
+        if not self.lic_input == "":
+            self.successors = [
+                item
+                for item in self.successors
+                if ((lic := self.graph.nodes[item].get("outbound")) and self.lic_input in lic)
+            ]
+
+            self.predecessors = [
+                item
+                for item in self.predecessors
+                if ((lic := self.graph.nodes[item].get("outbound")) and self.lic_input in lic)
+            ]
 
         pred_list = self.query_one("#predecessors", ListView)
         pred_list.clear()
