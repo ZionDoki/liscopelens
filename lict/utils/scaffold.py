@@ -148,7 +148,7 @@ def get_resource_path(
     if file_name:
         return importlib.resources.files(resource_path).joinpath(file_name)
 
-    return importlib.resources.files(resource_path).joinpath("")
+    return importlib.resources.files(resource_path)
 
 
 def delete_duplicate_str(data: list[str]) -> list[str]:

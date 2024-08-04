@@ -824,7 +824,7 @@ def load_licenses(path: Optional[str] = None) -> dict[str, LicenseFeat]:
     """
 
     if path is None:
-        path = str(get_resource_path(resource_name="resources.licenses"))
+        path = str(get_resource_path().joinpath("licenses"))
 
     paths = filter(lambda x: not x.startswith("schemas") and x.endswith(".toml"), os.listdir(path))
 
@@ -842,7 +842,7 @@ def load_exceptions(path: Optional[str] = None) -> dict[str, LicenseFeat]:
         dict[str, LicenseFeat]: dictionary of exceptions
     """
     if path is None:
-        path = str(get_resource_path(resource_name="resources.exceptions"))
+        path = str(get_resource_path().joinpath("exceptions"))
 
     paths = filter(lambda x: not x.startswith("schemas") and x.endswith(".toml"), os.listdir(path))
 
@@ -861,9 +861,9 @@ def load_schemas(path: Optional[str] = None) -> Schemas:
     """
 
     if path is None:
-        path = str(get_resource_path())
+        path = str(get_resource_path().joinpath("schemas.toml"))
 
-    return Schemas.from_toml(os.path.join(path, "schemas.toml"))
+    return Schemas.from_toml(path)
 
 
 def load_config(path: Optional[str] = None) -> Config:

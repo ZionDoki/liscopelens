@@ -683,6 +683,7 @@ class CompatibleInfer:
             self.properties_graph.save(f"{dir_path}/{Settings.LICENSE_PROPERTY_GRAPH}")
             self.compatible_graph.save(f"{dir_path}/{Settings.LICENSE_COMPATIBLE_GRAPH}")
         else:
-            destination = get_resource_path()
-            self.properties_graph.save(f"{destination}/{Settings.LICENSE_PROPERTY_GRAPH}")
-            self.compatible_graph.save(f"{destination}/{Settings.LICENSE_COMPATIBLE_GRAPH}")
+            property_path = str(get_resource_path().joinpath(Settings.LICENSE_PROPERTY_GRAPH))
+            compatible_path = str(get_resource_path().joinpath(Settings.LICENSE_COMPATIBLE_GRAPH))
+            self.properties_graph.save(property_path)
+            self.compatible_graph.save(compatible_path)

@@ -341,7 +341,7 @@ class TestParser(BaseParser):
     }
 
     def parse(self, project_path: str, context: GraphManager):
-        with open(self.args.user_config_file, "r") as f:
+        with open(self.args.user_config_file, "r", encoding="utf-8") as f:
             user_config = toml.load(f)
             f.close()
         subgraph_list = context.get_subgraph_depth()
