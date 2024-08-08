@@ -58,6 +58,7 @@ def cli():
 
     if args.config:
         config = load_config(args.config)
+        print("load config from", args.config)
     else:
         config = load_config()
 

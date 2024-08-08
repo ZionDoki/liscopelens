@@ -68,7 +68,6 @@ class BaseExceptionParser(BaseParser):
 
         save_kg = getattr(self.args, "save_kg", False)
         ignore_unk = getattr(self.args, "ignore_unk", False)
-
         blacklist = getattr(self.config, "blacklist", [])
 
         visited_licenses, new_for_infer = set(), {}

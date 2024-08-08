@@ -1,0 +1,16 @@
+# _ if "DEFAULT" in permissive_spreads, then permissive license in any circumstances
+# _ have to be spread to upstream components
+
+
+blacklist = ["GPL-3.0-only"]
+license_isolations = ["EXECUTABLE"]
+permissive_spreads = ["COMPILE", "STATIC_LINKING"]
+
+[literal_mapping]
+code = "COMPILE"
+shared_library = "DYNAMIC_LINKING"
+static_library = "STATIC_LINKING"
+executable = "EXECUTABLE"
+generated_file = "GENERATED"
+action = "EXECUTABLE"
+group = "EXECUTABLE"

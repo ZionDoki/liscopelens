@@ -89,6 +89,8 @@ options:
 
 ### 审查结果
 
+执行完成后审查冲突结果（请确保传入输出位置参数 `lict <command> ... --output path/to/output_dir`）
+
 ```shell
 lict query /path/to/output_dir
 ```
@@ -294,4 +296,3 @@ export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 ## 参与贡献
 
 参见[设计文档](doc/设计文档.md#开发手册)
-

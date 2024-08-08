@@ -264,19 +264,26 @@ class TestRule:
 
         with open(f"{results}/{folder_name}/results.json", "r", encoding="utf-8") as file:
             results = json.load(file)
-        files_set = []
+        files = []
         conflicts = []
         for key, value in results.items():
-            if "files" in value:
-                files_set.append(value["files"])
-            if "conflicts" in value:
-                conflicts.append(value["conflicts"])
+            conflicts.append((value["conflicts"]))
+            for license_key in value.keys():
+                if license_key != "conflicts":
+                    files.append(value[license_key])
         unique_conflicts = []
         for i in conflicts:
             for j in i:
                 unique_conflicts.append(j)
 
         unique_conflicts = [list(t) for t in set(tuple(_) for _ in unique_conflicts)]
+        files_set = []
+        if files:
+            if files[0]:
+                if len(files) > 1:
+                    files_set.append(files[0] + files[1])
+                else:
+                    files_set.append(files[0])
         flag = False
         if rule == "same_component":
             an_node = [[node]]
@@ -360,7 +367,7 @@ class TestParser(BaseParser):
             except FileExistsError:
                 pass
             license_a = value["license_A"]
-            license_b = value["license_B"]
+            license_b = value.get("license_B", None)
             condition = value["condition"]
             conflicts = value["conflicts"]
             blacklist = value.get("blacklist", None)

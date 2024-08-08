@@ -365,14 +365,8 @@ class OrLaterRelicenseRule(CompatibleRule):
                 is_compatible = graph.query_edge_by_label(a, b, compatibility=CompatibleType.UNCONDITIONAL_COMPATIBLE)
 
                 if bool(is_compatible):
-                    origin_edges = graph.query_edge_by_label(
-                        license_a.spdx_id if a == tgt else license_b.spdx_id,
-                        license_a.spdx_id if b == tgt else license_b.spdx_id,
-                        compatibility=CompatibleType.INCOMPATIBLE,
-                    )
-
-                    for edge_index in origin_edges:
-                        graph.remove_edge(edge_index)
+                    self.rm_existed_edges(graph, license_a, license_b, CompatibleType.INCOMPATIBLE, True)
+                    self.rm_existed_edges(graph, license_a, license_b, CompatibleType.CONDITIONAL_COMPATIBLE, True)
 
                     edge = self.new_edge(
                         license_a if a == tgt else license_b,
