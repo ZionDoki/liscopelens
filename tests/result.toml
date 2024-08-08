@@ -9,6 +9,7 @@
 ["Apache-2.0"]
 "GPL-2.0-or-later" = 0
 "GPL-2.0-only" = 3
+"LGPL-2.1-or-later" = 0
 
 ["GPL-2.0-or-later"]
 "Apache-2.0" = 0 # ! 我们认为基于 or-later 规则兼容的不需要作为条件兼容进行处理
@@ -16,3 +17,6 @@
 ["GPL-1.0-or-later"]
 "GPL-2.0-only" = 0
 "GPL-2.0-or-later" = 0
+
+["LGPL-2.1-or-later"]
+"Apache-2.0" = 0

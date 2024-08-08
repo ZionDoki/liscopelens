@@ -23,7 +23,7 @@ TODO: need write ut for this module @Zihao
 import os
 import warnings
 from collections import defaultdict
-from typing import Iterator, Optional, MutableMapping, Mapping
+from typing import Iterator, Optional, MutableMapping, Mapping, Any
 
 import networkx as nx
 from matplotlib import pyplot as plt
@@ -461,7 +461,7 @@ class GraphManager:
         for node in filter(lambda x: self._compare_node(x[1], kwargs), self.graph.nodes(data=True)):
             yield node[0], node[1]
 
-    def modify_node_attribute(self, node_label: str, new_attribute: str, new_value: str):
+    def modify_node_attribute(self, node_label: str, new_attribute: str, new_value: Any):
         """
         Modify the attribute of a node in the graph.
 
@@ -469,7 +469,7 @@ class GraphManager:
             graph_manager (GraphManager): The graph manager object containing the graph.
             node_label (str): The label of the node to be modified.
             new_attribute (str): The name of the new attribute to be added or modified.
-            new_value (str): The value of the new attribute.
+            new_value (Any): The value of the new attribute.
         """
         target_node = self.query_node_by_label(node_label)
         if target_node:

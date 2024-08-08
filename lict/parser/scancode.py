@@ -41,6 +41,11 @@ class ScancodeParser(BaseParser):
             "help": "The path of the directory that contain json files",
             "group": "scancode",
         },
+        "--shadow-license": {
+            "type": str,
+            "help": "The file path which storage (node-license) pair. Shadow licenses to certain nodes in advance",
+            "default": None,
+        },
         "--rm-ref-lang": {
             "action": "store_true",
             "help": "Automatically remove scancode ref prefix and language suffix from spdx ids",
@@ -63,6 +68,27 @@ class ScancodeParser(BaseParser):
             context_node["licenses"] = spdx_results
             context_node["test"] = test
             self.count.add(parent_label)
+
+    def parse_shadow(self, json_path: str, context: GraphManager):
+        """
+        Parse the shadow license file and add the license to the context.
+
+        Usage:
+            ```python
+
+            parser = ScancodeParser(args, config)
+            context = parser.parse_shadow("shadow.json", context)
+            ```
+        """
+        if context is None:
+            raise ValueError(f"Context can not be None in {self.__class__.__name__}.")
+        with open(json_path, "r") as f:
+            scancode_results = json.load(f)
+        spdx = SPDXParser()
+        for key, values in scancode_results.items():
+            license = spdx(values)
+            context.modify_node_attribute(key, "licenses", license)
+        return context
 
     def remove_ref_lang(self, spdx_id: str) -> str:
 
@@ -125,7 +151,7 @@ class ScancodeParser(BaseParser):
         ```shell
         scancode --json-pp license.json .
         # or
-        scanode --json-pp license.json /path/to/your/project
+        scancode --json-pp license.json /path/to/your/project
 
         # the path of the scancode's output is relative path
         ```
@@ -135,7 +161,6 @@ class ScancodeParser(BaseParser):
             if not os.path.exists(self.args.scancode_file):
                 raise FileNotFoundError(f"File not found: {self.args.scancode_file}")
             self.parse_json(self.args.scancode_file, context)
-            return context
         elif getattr(self.args, "scancode_dir", None):
             if not os.path.exists(self.args.scancode_dir):
                 raise FileNotFoundError(f"Directory not found: {self.args.scancode_dir}")
@@ -151,7 +176,15 @@ class ScancodeParser(BaseParser):
                 ),
                 open("scancode.json", "w"),
             )
-
-            return context
         else:
             raise ValueError("The path of the scancode's output is not provided.")
+
+        if getattr(self.args, "shadow_license", None):
+            print("Parsing shadow license...")
+            self.parse_shadow(self.args.shadow_license, context)
+
+        if output := getattr(self.args, "output", None):
+            os.makedirs(output, exist_ok=True)
+            context.save(output + "/origin.gml")
+
+        return context

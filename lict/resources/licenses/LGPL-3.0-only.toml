@@ -1,10 +1,8 @@
-human_review = false
-
 [can.commercial_use]
 protect_scope = []
 escape_scope = []
 
-[can.modify]
+[can.private_use]
 protect_scope = []
 escape_scope = []
 
@@ -12,15 +10,11 @@ escape_scope = []
 protect_scope = []
 escape_scope = []
 
-[can.patent_grant]
+[can.modify]
 protect_scope = []
 escape_scope = []
 
-[cannot.sublicense]
-protect_scope = []
-escape_scope = []
-
-[cannot.provide_warranty]
+[can.set_geographical_condition]
 protect_scope = []
 escape_scope = []
 
@@ -28,11 +22,11 @@ escape_scope = []
 protect_scope = []
 escape_scope = [ "TRADEMARK",]
 
-[must.include_original]
+[cannot.provide_warranty]
 protect_scope = []
 escape_scope = []
 
-[must.state_changes]
+[cannot.patent_suit]
 protect_scope = []
 escape_scope = []
 
@@ -48,6 +42,28 @@ escape_scope = []
 protect_scope = []
 escape_scope = []
 
-[must.include_install_instruction]
+[must.include_original]
 protect_scope = []
 escape_scope = []
+
+[must.include_notice]
+protect_scope = []
+escape_scope = []
+
+[must.set_same_license]
+protect_scope = []
+escape_scope = [ "ASK_FOR_AUTH",]
+
+[must.state_changes]
+protect_scope = []
+escape_scope = []
+
+[special.triggering]
+protect_scope = []
+escape_scope = []
+target = [ "cannot.use_trademark", "cannot.patent_suit",]
+
+[special.relicense]
+protect_scope = [ "DYNAMIC_LINKING",]
+escape_scope = []
+target = [ "public-domain",]
