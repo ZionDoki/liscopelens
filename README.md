@@ -1,17 +1,18 @@
 # compliance_license_compatibility
 
 
-1. [compliance\_license\_compatibility](#compliance_license_compatibility)
-   1. [介绍](#介绍)
-      1. [目录结构](#目录结构)
-   2. [安装教程](#安装教程)
-   3. [使用说明](#使用说明)
-      1. [基于sbom文件分析兼容性](#基于sbom文件分析兼容性)
-         1. [参数列表](#参数列表)
-      2. [分析代码仓库的兼容性(请确保存在gn工具或者gn解析文件)](#分析代码仓库的兼容性请确保存在gn工具或者gn解析文件)
-         1. [参数列表](#参数列表-1)
-   4. [已知问题](#已知问题)
-   5. [参与贡献](#参与贡献)
+- [compliance\_license\_compatibility](#compliance_license_compatibility)
+  - [介绍](#介绍)
+  - [快速开始](#快速开始)
+  - [安装教程](#安装教程)
+  - [使用说明](#使用说明)
+    - [分析代码仓库的兼容性(请确保存在gn工具或者gn解析文件)](#分析代码仓库的兼容性请确保存在gn工具或者gn解析文件)
+      - [参数列表](#参数列表)
+      - [gn依赖图格式](#gn依赖图格式)
+  - [已知问题](#已知问题)
+  - [审查结果](#审查结果)
+  - [参与贡献](#参与贡献)
+
 
 
 ## 介绍
@@ -22,43 +23,9 @@
 
 **注意：本项目当前仍处于早期版本，相关结果的准确性未进行验证，且迭代过程中各模块接口将会发生较大变化。**
 
-### 目录结构
-```
-|-compliance_license_compatibility
-|  |─doc #设计文档
-|  |─poetry.lock #依赖管理文件
-|  |─pyproject.toml #依赖管理文件
-|  |─lict
-|       ├─config
-|       │  ├─default.toml #许可证传播规则配置文件
-|       ├─parser #根据传入参数解析sbom文件或者gn文件
-|       │  ├─base.py #定义抽象基类，构建解析器框架
-|       │  ├─compatible.py #实现用于检查许可证兼容性的逻辑
-|       │  ├─echo.py #用于输出兼容性检查结果
-|       │  ├─exception.py #异常处理
-|       │  ├─scancode.py #解析scancode输出的json文件
-|       │  ├─c_parser 
-|       │    ├─entry.py #C/C++代码仓库许可证检测程序的入口文件，该文件依次调用所需解析器执行检测
-|       │    ├─build_gn_parser.py #gn文件解析器
-|       │    ├─include_parser.py #构建代码之间的依赖关系
-|       │  ├─sbom_parser #解析sbom文件检测许可证兼容性
-|       │    ├─entry.py #sbom文件解析入口文件
-|       │    ├─sbom_parser.py #sbom文件解析器
-|       ├─resources
-|       │  ├─exceptions
-|       │  ├─licenses #定义不同许可证条款的规则与约束
-|       │  ├─schemas.toml #定义不同动作（actions）的规则和约束
-|       ├─utils
-|       │  ├─graph.py #图数据结构，存储依赖关系
-|       │  ├─scaffold.py  #存放工具函数
-|       │  ├─structure.py #许可证合规分析工具核心功能，包括定义许可证属性、解析许可证表达式、以及数据加载
-|       ├─app.py #入口文件
-|       ├─constants.py #常量定义文件
-|       ├─infer.py #使用结构化信息来推断不同许可证之间的兼容性，并生成知识图谱以供进一步使用
-|       ├─checker.py 
-|  |─examples
-|  |─tests
-```
+## 快速开始
+
+当前版本仅支持面向 OpenHarmony 的兼容性检测，欢迎使用面向 OpenHarmony 全量源码仓的一键检测脚本 [LictOneClick](https://gitee.com/zionmoe/lict-one-click)。
 
 ## 安装教程
 
@@ -87,108 +54,20 @@ options:
                         配置文件路径
 ```
 
-### 审查结果
-
-执行完成后审查冲突结果（请确保传入输出位置参数 `lict <command> ... --output path/to/output_dir`）
-
-```shell
-lict query /path/to/output_dir
-```
-
-![query演示](assets/example.gif)
-
-### 基于sbom文件分析兼容性
-
-目前仅支持OH SBOM文件，文件应符合如下格式
-
-```json
-{
-    "spdxId": "0eedfd2b-5a20-4cad-adf8-371197d0cd27",
-    "spdxVersion": "SPDX-2.2",
-    "creationInfo": {
-        "created": "2023-12-05 09:59:05",
-        "creators": [
-            "Organization: OpenHarmony"
-        ]
-    },
-    "packages": [
-        {
-            "spdxId": "A",
-            "name": "A",
-            "downloadLocation": "https://gitee.com/openhamony/dcts/tree/master",
-            "versionInfo": "3.1",
-            "supplier": "Organization: OpenHarmony",
-            "externalRefs": [
-                {
-                    "referenceCategory": "PACKAGE_MANAGER",
-                    "referenceType": "purl",
-                    "referenceLocator": "pkg:gitee/openharmony/xts_dcts@master?revision\u003d24a3c135de1830bde84a98c1990843ee3b32feaa"
-                }
-            ],
-            "licenses": [
-                {
-                    "spdxId": "MIT"
-                }
-            ]
-        },
-        {
-            "spdxId": "B",
-            "name": "B",
-            "downloadLocation": "https://gitee.com/openhamony/dcts/tree/master",
-            "versionInfo": "3.1",
-            "supplier": "Organization: OpenHarmony",
-            "externalRefs": [
-                {
-                    "referenceCategory": "PACKAGE_MANAGER",
-                    "referenceType": "purl",
-                    "referenceLocator": "pkg:gitee/openharmony/xts_dcts@master?revision\u003d24a3c135de1830bde84a98c1990843ee3b32feaa"
-                }
-            ],
-            "licenses": [
-                {
-                    "spdxId": "Apache-2.0"
-                }
-            ]
-        }
-    ],
-    "relationships": [
-        {
-            "spdxElementId": "A",
-            "relationshipType": "DEPENDS_ON",
-            "relatedSpdxElement": "B"
-        }
-    ]
-}
-
-```
-
-查看帮助 `lict sbom -h`
-
-```shell
-usage: lict sbom [-h]  [--sbom_file SBOM_FILE]
-
-options:
-  -h, --help            show this help message and exit
-  --sbom_file SBOM_FILE  sbom_file_path
-```
-
-运行shell命令进行兼容性检查
-
-```shell
-lict sbom --sbom_file SBOMPATH
-```
-
-#### 参数列表
-
-| 参数        | 类型 | 说明         | 是否必须 |
-| ----------- | ---- | ------------ | -------- |
-| --c         | str  | 配置文件路径 | 否       |
-| sbom        | bool | 指明使用sbom | 是       |
-| --sbom_file | str  | sbom文件路径 | 是       |
-
-
 ### 分析代码仓库的兼容性(请确保存在gn工具或者gn解析文件)
-查看帮助 `lict cpp -h`
+
+1. 获取 OpenHarmoy 源码
+2. 安装 OpenHarmony 编译构建工具执行 
+    `./build.sh --product-name {设备形态} --gn-flags="--ide=json" --gn-flags="--json-file-name=out.json"`
+3. 确保在源码根目录下具有`OpenHarmony/out/{设备形态}/out.json` 存在
+4. 使用 Scancode 扫描 OpenHarmony 许可证
+5. 执行 lict 进行兼容性扫描
+    ```shell
+    lict cpp --gn_file OpenHarmony/out/{设备形态}/out.json --scancode-file path/to/scancode-res.json --output ./output
+    ```
+1. 查看 `output/results.json` 或则借助[审查工具](#审查结果)
+
+其他参数可以，查看帮助 `lict cpp -h`，解释如下：
 ```shell
 usage: lict cpp [-h] (--gn_tool GN_TOOL | --gn_file GN_FILE)
                 (--scancode-file SCANCODE_FILE | --scancode-dir SCANCODE_DIR) [--rm-ref-lang] [--save-kg]
@@ -209,10 +88,7 @@ options:
   --echo                Echo the final result of compatibility checking
   --out-echo OUT_ECHO   The output path of the echo result
 ```
-运行shell命令进行兼容性检查，示例如下
-```shell
-lict cpp --gn_tool GN_TOOL --scancode-file SCANCODE_FILE --echo 
-```
+
 
 #### 参数列表
 
@@ -230,7 +106,8 @@ lict cpp --gn_tool GN_TOOL --scancode-file SCANCODE_FILE --echo
 | --echo          | bool | 回显兼容性检查的最终结果             | 否       |
 | --out-echo      | str  | 回显结果的输出路径                   | 否       |
 
-gn依赖图格式如下
+#### gn依赖图格式
+
 ```json
 {
   "build_settings": {
@@ -292,6 +169,16 @@ gn依赖图格式如下
 ```shell
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 ```
+
+## 审查结果
+
+执行完成后审查冲突结果（请确保传入输出位置参数 `lict <command> ... --output path/to/output_dir`）
+
+```shell
+lict query /path/to/output_dir
+```
+
+![query演示](assets/example.gif)
 
 ## 参与贡献
 

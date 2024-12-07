@@ -12,16 +12,12 @@ include = [
 [tool.poetry.dependencies]
 python = "^3.11"
 networkx = "^3.2.1"
-matplotlib = "^3.8.3"
 toml = "^0.10.2"
 rich = "^13.7.1"
 textual = "^0.73.0"
 
 [tool.poetry.scripts]
 lict = "lict.app:cli"
-
-[tool.poetry.group.dev.dependencies]
-numpy = "^1.26.4"
 
 [build-system]
 requires = ["poetry-core"]
