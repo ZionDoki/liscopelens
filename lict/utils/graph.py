@@ -26,8 +26,6 @@ from collections import defaultdict
 from typing import Iterator, Optional, MutableMapping, Mapping, Any
 
 import networkx as nx
-from matplotlib import pyplot as plt
-
 
 EdgeIndex = tuple[str, str, Optional[int]]
 
@@ -571,6 +569,7 @@ class GraphManager:
         return cls(file_path)
 
     def viz(self, output_path: str = "graph.png"):
-        """visualize the graph and save it to the file."""
+        """
+        ! deprecated
+        visualize the graph and save it to the file."""
         nx.draw(self.graph, with_labels=True, font_weight="bold")
-        plt.savefig(output_path)
