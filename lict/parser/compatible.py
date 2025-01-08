@@ -267,7 +267,7 @@ class BaseCompatiblityParser(BaseParser):
                             conflict_pattern = conflicts_table.get(conflict_id, set())
 
                             # _ here to check if current node has contribution to the conflict then add conflict_id to it
-                            if self.is_conflict_happened(current_outbound, conflict_pattern):
+                            if self.is_conflict_happened(dual_after_check, conflict_pattern):
                                 context.nodes[current_node]["conflict_group"] = (
                                     context.nodes[current_node].get("conflict_group", set()).union({conflict_id})
                                 )
