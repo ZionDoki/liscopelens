@@ -18,11 +18,11 @@ conflicts = []
 
 [Pair_3]
 
-license_A = "4.3BSD"
+license_A = "4.3-BSD"
 license_B = "Apache-2.0"
 condition = ["brother"]
-description = ["4.3BSD AND Apache-2.0"]
-conflicts = [["4.3BSD", "Apache-2.0"]]
+description = ["4.3-BSD AND Apache-2.0"]
+conflicts = [["4.3-BSD", "Apache-2.0"]]
 
 
 [Pair_4]
@@ -270,6 +270,15 @@ conflicts = []
 license_A = "Apache-2.0"
 license_B = "GPL-2.0-or-later"
 condition = ["same_component"]
+description = ["Apache-2.0 AND GPL-2.0-or-later"]
+conflicts = [["Apache-2.0", "GPL-2.0-or-later"]]
+blacklist = ["GPL-3.0-only"]
+
+[Pair_32]
+
+license_A = "Apache-2.0"
+license_B = "GPL-2.0-or-later"
+condition = ["brother"]
 description = ["Apache-2.0 AND GPL-2.0-or-later"]
 conflicts = [["Apache-2.0", "GPL-2.0-or-later"]]
 blacklist = ["GPL-3.0-only"]

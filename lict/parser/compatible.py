@@ -188,6 +188,8 @@ class BaseCompatiblityParser(BaseParser):
         """
         Check if the conflict happened in the dual license
 
+        Any license group in the dual license that does not contain the conflict license will return False.
+
         Args:
             - dual_lic (DualLicense): The dual license
             - conflicts (set[frozenset[str]]): The conflict licenses
@@ -231,7 +233,7 @@ class BaseCompatiblityParser(BaseParser):
             total_nodes = len(context.graph.nodes)
             task = progress.add_task("[red]Parsing compatibility...", total=total_nodes)
             for sub in nx.weakly_connected_components(context.graph):
-                for current_node, parents, children in self.generate_processing_sequence(
+                for current_node, parents, _ in self.generate_processing_sequence(
                     context.graph.subgraph(sub).copy()
                 ):
 
@@ -273,7 +275,8 @@ class BaseCompatiblityParser(BaseParser):
                             if dual_after_check:
                                 continue
 
-                            new_pattern = set(filter(lambda conflict: conflict not in conflict_pattern, conflicts))
+                            # new_pattern = set(filter(lambda conflict: conflict not in conflict_pattern, conflicts))
+                            new_pattern = set([conflict for conflict in new_pattern if conflict not in conflict_pattern])
 
                             if len(new_pattern) != len(conflicts):
                                 context.nodes[current_node]["conflict_group"] = (
@@ -290,8 +293,8 @@ class BaseCompatiblityParser(BaseParser):
                     if not parent_conflict_flag:
 
                         uuid = str(uuid4())
-                        for conflict_id in conflicts_table:
-                            if conflicts == conflicts_table[conflict_id]:
+                        for conflict_id, conflict_set in conflicts_table.items():
+                            if conflicts == conflict_set:
                                 uuid = conflict_id
                                 break
 
@@ -302,8 +305,8 @@ class BaseCompatiblityParser(BaseParser):
                     elif new_pattern_flag:
 
                         uuid = str(uuid4())
-                        for conflict_id in conflicts_table:
-                            if new_pattern == conflicts_table[conflict_id]:
+                        for conflict_id, conflict_set in conflicts_table.items():
+                            if new_pattern == conflict_set:
                                 uuid = conflict_id
                                 break
 
@@ -341,7 +344,7 @@ class BaseCompatiblityParser(BaseParser):
 
                         ret_results[conflict_id][lic] = ret_results[conflict_id].get(lic, set()).union({node})
 
-            with open(output + "/results.json", "w") as f:
+            with open(output + "/results.json", "w", encoding="utf8") as f:
                 f.write(json.dumps(ret_results, default=lambda x: set2list(x) if isinstance(x, set) else x, indent=4))
 
         return context
