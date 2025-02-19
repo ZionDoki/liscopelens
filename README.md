@@ -1,3 +1,7 @@
+本仓库于2025年2月22日迁移到GitCode，后续不再更新维护。
+
+请访问[GitCode](https://gitcode.com/openharmony-sig/compliance_license_compatibility)获取最新代码，欢迎大家在新仓库进行贡献和交流。
+
 # compliance_license_compatibility
 
 
