@@ -11,6 +11,7 @@
   - [Known Issues](#known-issues)
   - [Review Results](#review-results)
   - [Contributing](#contributing)
+  - [Reproduction and Data Acquisition](#Reproduction-and-Data-Acquisition)
 
 ## Introduction
 
@@ -179,3 +180,14 @@ lict query /path/to/output_dir
 ## Contributing
 
 Refer to the [Design Document](doc/设计文档.md#开发手册) for more details.
+
+## Reproduction and Data Acquisition
+
+To reproduce the results of the CASE STUDY in this work, please obtain the source code of [OpenHarmony 5.0 beta version](https://gitcode.com/openharmony/docs/blob/OpenHarmony-5.0-Beta1/en/release-notes/OpenHarmony-v5.0-beta1.md#source-code-acquisition).  
+After that, you can use our one-click script for verification:  
+
+[https://gitee.com/zionmoe/lict-one-click](https://gitee.com/zionmoe/lict-one-click) 
+
+The license risk modification results confirmed by this work can be found at:
+
+[https://gitcode.com/openharmony/third_party_musl/commit/fdeaedb7e9448c2bb071099a4d6623c011a39cc3](https://gitcode.com/openharmony/third_party_musl/commit/fdeaedb7e9448c2bb071099a4d6623c011a39cc3)
