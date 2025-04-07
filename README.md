@@ -14,6 +14,7 @@
   - [参与贡献](#参与贡献)
 
 
+[English Version](README.en.md)
 
 ## 介绍
 
@@ -183,3 +184,7 @@ lict query /path/to/output_dir
 ## 参与贡献
 
 参见[设计文档](doc/设计文档.md#开发手册)
+
+## 结果复现
+
+参见[Reproduction and Data Acquisition](README.en.md#Reproduction-and-Data-Acquisition)
