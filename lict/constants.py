@@ -30,9 +30,11 @@ class Settings(StrEnum):
 
     PACKAGE_NAME = "lict"
     RESOURCE_NAME = "resources"
-    LICENSE_PROPERTY_GRAPH = "properties_graph.gml"
-    LICENSE_COMPATIBLE_GRAPH = "compatible_graph.gml"
+    LICENSE_PROPERTY_GRAPH = "properties_graph"
+    LICENSE_COMPATIBLE_GRAPH = "compatible_graph"
     LICENSE_FEATURE = "licenses_feature.json"
+    GRAPH_SAVE_FORMAT = "gml"
+
 
 
 class CompatibleType(IntEnum):

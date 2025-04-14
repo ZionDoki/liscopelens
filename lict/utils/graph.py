@@ -21,6 +21,7 @@ TODO: need write ut for this module @Zihao
 """
 
 import os
+import json
 import warnings
 from collections import defaultdict
 from typing import Iterator, Optional, MutableMapping, Mapping, Any
@@ -132,12 +133,10 @@ class GraphManager:
             else:
                 self.graph = nx.read_gml(file_path)
 
-    @property
     def nodes(self, **kwargs):
         """wrapper for the nodes of the networkx."""
         return self.graph.nodes(**kwargs)
 
-    @property
     def edges(self, **kwargs):
         """wrapper for the edges of the networkx."""
         return self.graph.edges(**kwargs)
@@ -559,17 +558,19 @@ class GraphManager:
 
         return sibling_pairs
 
-    def save(self, file_path: str, stringizer=None):
+    def save(self, file_path: str, stringizer=None, save_format="gml"):
         """save the graph to the file."""
-        nx.write_gml(self.graph, file_path, stringizer=stringizer if stringizer else str)
+        match(save_format):
+            case "gml":
+                nx.write_gml(self.graph, file_path, stringizer=stringizer if stringizer else str)
+            case "json":
+                data = nx.readwrite.json_graph.node_link_data(self.graph, edges="edges")
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(json.dumps(data, indent=4, ensure_ascii=False))
+            case _:
+                raise ValueError(f"Unsupported save_format: {save_format}. Supported formats are 'gml' and 'json'.")
 
     @classmethod
     def load_from_disk(cls, file_path: str):
         """load the graph from the file."""
         return cls(file_path)
-
-    def viz(self, output_path: str = "graph.png"):
-        """
-        ! deprecated
-        visualize the graph and save it to the file."""
-        nx.draw(self.graph, with_labels=True, font_weight="bold")

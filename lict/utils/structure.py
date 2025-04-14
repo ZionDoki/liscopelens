@@ -801,6 +801,8 @@ class SPDXParser:
             elif isinstance(expression[idx], DualUnit):
                 current_results = DualLicense((frozenset([expression[idx]]),))
                 idx += 1
+            else:
+                raise SyntaxError(f"Unexpected token {expression[idx]}")
 
             if previous_op == "AND":
                 results &= current_results
@@ -812,12 +814,13 @@ class SPDXParser:
         return results
 
 
-def load_licenses(path: Optional[str] = None) -> dict[str, LicenseFeat]:
+def load_licenses(path: Optional[str] = None, only_reviewed: bool = False) -> dict[str, LicenseFeat]:
     """
     Load licenses from a directory of toml files
 
     Args:
         path: path to directory of toml files
+        only_reviewed: if True, only load licenses that need human review
 
     Returns:
         dict[str, LicenseFeat]: dictionary of licenses
@@ -828,7 +831,10 @@ def load_licenses(path: Optional[str] = None) -> dict[str, LicenseFeat]:
 
     paths = filter(lambda x: not x.startswith("schemas") and x.endswith(".toml"), os.listdir(path))
 
-    return {lic.spdx_id: lic for p in paths if (lic := LicenseFeat.from_toml(os.path.join(path, p)))}
+    ret = {lic.spdx_id: lic for p in paths if (lic := LicenseFeat.from_toml(os.path.join(path, p)))}
+    if only_reviewed:
+        ret = {k: v for k, v in ret.items() if v.human_review}
+    return ret
 
 
 def load_exceptions(path: Optional[str] = None) -> dict[str, LicenseFeat]:
