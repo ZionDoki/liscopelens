@@ -560,6 +560,9 @@ class DualLicense(set[frozenset[DualUnit]]):
     """
     Dual licenses class. Use to represent dual licenses in a set[fronsenset[DualUnit]] structure.
 
+    Properties:
+        licenses_set: set[str], set of licenses
+
     Usage:
         Because the license have dual circumstances, we use a set of frozenset[DualUnit] to represent the dual licenses.
         Each fronzenset in the set represents a `group` of licenses.
@@ -575,6 +578,17 @@ class DualLicense(set[frozenset[DualUnit]]):
         dual_license = DualLicense.from_list(licenses)
         ```
     """
+
+    @property
+    def licenses_set(self) -> set[str]:
+        """
+        Get the set of licenses.
+
+        Returns:
+            set[str]: set of licenses
+        """
+        return {unit["spdx_id"] for group in self for unit in group}
+
 
     @classmethod
     def from_list(cls, licenses: list[list[DualUnit] | frozenset[DualUnit]]) -> "DualLicense":
