@@ -27,7 +27,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Type, Optional, Callable
 from copy import deepcopy
 
-from lict.utils.scaffold import (
+from liscopelens.utils.scaffold import (
     is_file_in_resources,
     get_resource_path,
     normalize_version,
@@ -35,7 +35,7 @@ from lict.utils.scaffold import (
     find_all_versions,
     find_duplicate_keys,
 )
-from lict.utils.structure import (
+from liscopelens.utils.structure import (
     Scope,
     Schemas,
     ActionFeat,
@@ -44,7 +44,7 @@ from lict.utils.structure import (
     load_licenses,
     ActionFeatOperator,
 )
-from lict.utils.graph import Edge, GraphManager, Triple, Vertex
+from liscopelens.utils.graph import Edge, GraphManager, Triple, Vertex
 from .constants import Settings, CompatibleType, FeatureProperty
 
 
@@ -228,7 +228,6 @@ class CompatibleRule(ABC):
         Returns:
             tuple: (Next rule type, Optional edge)
         """
-        pass
 
 
 class EndRule(CompatibleRule):
@@ -696,7 +695,7 @@ class ComplianceRequirementRule(CompatibleRule):
 
                 # Check scope compatibility
                 for key, action in license_a_actions.items():
-                    if license_b_actions.get(key, False) == False:
+                    if license_b_actions.get(key, False) is False:
                         continue
 
                     if not ActionFeatOperator.contains(action, license_b_actions[key]):
@@ -734,7 +733,7 @@ class ComplianceRequirementRule(CompatibleRule):
             return EndRule, None
 
         # Check if license_b's requirements are met by license_a
-        is_compliance, reason = self.check_compliance(license_b, license_a)
+        is_compliance, reason = self.check_compliance(license_a=license_b, license_b=license_a)
         if not is_compliance:
             self.set_reason(
                 f"Compliance requirements of license {license_b.spdx_id} are not met by {license_a.spdx_id}: {reason}"
@@ -832,7 +831,7 @@ class ClauseConflictRule(CompatibleRule):
                     # If the compatible scope is empty, they are incompatible
                     if not compatible_scope:
                         reason = f"The {modal_a}.{conflict} of license {license_a.spdx_id} conflicts with the {modal_b}.{conflict} of {license_b.spdx_id},"
-                        reason += f" and there is no scope to avoid the conflict, determined to be incompatible."
+                        reason += " and there is no scope to avoid the conflict, determined to be incompatible."
                         self.set_reason(reason)
                         edge = self.new_edge(license_a, license_b, compatibility=CompatibleType.INCOMPATIBLE)
                         graph.add_edge(edge)
@@ -991,7 +990,8 @@ class CompatibleInfer:
             all_reasons = []
 
             # Execute the rule chain
-            while not (type(current_rule) == type(self.rules[self.end_rule])):
+            expected_cls = type(self.rules[self.end_rule])
+            while not isinstance(current_rule, expected_cls):
                 if type(current_rule).__name__ in visited:
                     raise ValueError(
                         f"Rule {type(current_rule).__name__} was visited twice, possible circular dependency."

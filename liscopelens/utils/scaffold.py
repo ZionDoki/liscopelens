@@ -23,10 +23,10 @@ import time
 import shutil
 import tempfile
 import importlib.resources
-from importlib.abc import Traversable
+from importlib.resources.abc import Traversable
 
 from typing import Generator, Optional, TypeVar, Callable, Iterable
-from lict.constants import Settings
+from liscopelens.constants import Settings
 
 
 T = TypeVar("T")

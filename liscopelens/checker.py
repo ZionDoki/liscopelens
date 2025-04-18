@@ -20,9 +20,9 @@ import warnings
 
 from typing import Optional
 
-from lict.constants import CompatibleType
-from lict.infer import generate_knowledge_graph
-from lict.utils.structure import LicenseFeat, Scope
+from liscopelens.constants import CompatibleType
+from liscopelens.infer import generate_knowledge_graph
+from liscopelens.utils.structure import LicenseFeat, Scope
 
 
 class Checker:
@@ -162,7 +162,6 @@ class Checker:
 
         edge_index = self.compatible_graph.query_edge_by_label(license_a_id, license_b_id)
         if edge_index:
-            # TODO: check all edges
             edge = self.compatible_graph.get_edge_data(edge_index[0])
             if edge and edge["compatibility"] == CompatibleType.CONDITIONAL_COMPATIBLE:
 

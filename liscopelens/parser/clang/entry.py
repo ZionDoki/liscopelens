@@ -16,16 +16,13 @@
 # limitations under the License.
 #
 
-from .build_gn_parser import GnParser
-
-from ..scancode import ScancodeParser
-from ..exception import BaseExceptionParser
-from ..base import BaseParser, BaseParserEntry
-from ..compatible import BaseCompatiblityParser
-from ..propagate import BasePropagateParser
-
-from ..user_parser.echo import EchoPaser
-
+from liscopelens.parser.scancode import ScancodeParser
+from liscopelens.parser.exception import BaseExceptionParser
+from liscopelens.parser.base import  BaseParserEntry
+from liscopelens.parser.compatible import BaseCompatiblityParser
+from liscopelens.parser.propagate import BasePropagateParser
+from liscopelens.parser.inspector.echo import EchoPaser
+from liscopelens.parser.clang.gn import GnParser
 
 class CParserEntry(BaseParserEntry):
     parsers = (

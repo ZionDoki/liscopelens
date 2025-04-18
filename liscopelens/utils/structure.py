@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 
 import toml
 
-from lict.constants import ScopeToken
+from liscopelens.constants import ScopeToken
 from .scaffold import get_resource_path
 
 

@@ -28,11 +28,11 @@ from typing import Generator, Optional
 import networkx as nx
 from rich.progress import Progress
 
-from lict.checker import Checker
-from lict.constants import CompatibleType
+from liscopelens.checker import Checker
+from liscopelens.constants import CompatibleType
 
-from lict.utils import GraphManager, set2list
-from lict.utils.structure import DualLicense, Scope, Config
+from liscopelens.utils import GraphManager, set2list
+from liscopelens.utils.structure import DualLicense, Scope, Config
 
 from .base import BaseParser
 

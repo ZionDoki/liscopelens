@@ -27,10 +27,10 @@ from rich.progress import Progress
 
 
 from .base import BaseParser
-from lict.checker import Checker
+from liscopelens.checker import Checker
 
-from lict.utils.structure import DualLicense, Scope, Config, DualUnit
-from lict.utils import GraphManager, combined_generator, set2list, timer
+from liscopelens.utils.structure import DualLicense, Scope, Config, DualUnit
+from liscopelens.utils import GraphManager, combined_generator, set2list, timer
 
 
 class BasePropagateParser(BaseParser):
@@ -281,7 +281,7 @@ class BasePropagateParser(BaseParser):
                 elif condition in self.config.permissive_spreads or default_spread:
                     new_group.add(DualUnit(lic["spdx_id"], condition, lic["exceptions"]))
 
-                elif condition == None:
+                elif condition is None:
                     new_group.add(DualUnit(lic["spdx_id"], condition, lic["exceptions"]))
 
             if new_group:

@@ -16,11 +16,12 @@
 # limitations under the License.
 #
 
-from .sbom_parser import SBOMParser
-from lict.parser.base import BaseParser, BaseParserEntry
+from liscopelens.parser.inspector import QueryParser
+from liscopelens.parser.base import BaseParserEntry
 
 
-class SBOMParserEntry(BaseParserEntry):
-    parsers: tuple[BaseParser] = (SBOMParser,)
+class QueryEntry(BaseParserEntry):
+    parsers = (QueryParser,)
 
-    entry_help: str = "Software Bill of Materials (SBOM) parser, this parser only support for OH sbom format."
+    entry_name: str = "query"
+    entry_help: str = "This parser is used to query the results of the others parser"

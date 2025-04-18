@@ -17,20 +17,20 @@
 #
 
 
-import itertools
 import os
 import json
+from argparse import Namespace
+from typing import Optional
 
 import networkx as nx
 from textual.app import App, ComposeResult
 from textual.widgets import Input, ListView, ListItem, Label, Button
-from textual.containers import Vertical, Horizontal
-from argparse import Namespace
-from typing import Optional
-from lict.utils.structure import Config
-from lict.utils.graph import GraphManager
+from textual.containers import  Horizontal
 
-from ..base import BaseParser
+from liscopelens.utils.structure import Config
+from liscopelens.utils.graph import GraphManager
+
+from liscopelens.parser.base import BaseParser
 
 
 class GraphVisualizer(App):
@@ -99,7 +99,7 @@ class GraphVisualizer(App):
         self.search_node(self.search_input)
 
     def search_node(self, label):
-        for node, data in self.graph.nodes(data=True):
+        for node, _ in self.graph.nodes(data=True):
             if node.lower() == label.lower():
                 self.current_node: str = node
                 self.update_ui()
@@ -166,7 +166,7 @@ class GraphVisualizer(App):
         if isinstance(selected_item, ListItem):
 
             for child in selected_item.children:
-                if isinstance(child, Label) and event.control.index != None:
+                if isinstance(child, Label) and event.control.index is not None:
                     self.search_node(current_list[event.control.index])
 
 

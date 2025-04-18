@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "lict"
-version = "0.1.1"
+name = "liscopelens"
+version = "0.1.2"
 description = "A tool to analyze the compatibility of licenses in a project."
 authors = ["Bird <bird@lzu.edu.cn>", "ZI0N <liuza20@lzu.edu.cn>", "Zihao Zhang <zhzihao2023@lzu.edu.cn>"]
 readme = "README.md"
 include = [ 
-    { path = "lict/resources/*.toml", format = ["sdist", "wheel"] },
-    { path = "lict/resources/*.gml", format = ["sdist", "wheel"] },
+    { path = "liscopelens/resources/*.toml", format = ["sdist", "wheel"] },
+    { path = "liscopelens/resources/*.gml", format = ["sdist", "wheel"] },
 ]
 
 [tool.poetry.dependencies]
@@ -17,7 +17,7 @@ rich = "^14.0.0"
 textual = "^3.0.1"
 
 [tool.poetry.scripts]
-lict = "lict.app:cli"
+liscopelens = "liscopelens.app:cli"
 
 [build-system]
 requires = ["poetry-core"]

@@ -23,11 +23,11 @@ from argparse import Namespace
 
 from rich.progress import Progress
 
-from lict.utils import set2list
-from lict.utils.structure import Config
-from lict.utils.graph import GraphManager
+from liscopelens.utils import set2list
+from liscopelens.utils.structure import Config
+from liscopelens.utils.graph import GraphManager
 
-from ..base import BaseParser
+from liscopelens.parser.base import BaseParser
 
 
 class EchoPaser(BaseParser):
@@ -71,7 +71,7 @@ class EchoPaser(BaseParser):
                 progress.update(task, advance=1)
 
         if output:
-            with open(output + "/results.json", "w") as f:
+            with open(output + "/results.json", "w", encoding="utf-8") as f:
                 f.write(json.dumps(results, default=lambda x: set2list(x) if isinstance(x, set) else str(x)))
         else:
             print(pformat(results))

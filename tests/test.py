@@ -2,11 +2,11 @@ import os
 from tkinter import NO
 import unittest
 import argparse
-from lict.infer import *
-from lict.checker import *
-from lict.utils.graph import *
-from lict.utils.structure import *
-from lict.parser import *
+from liscopelens.infer import *
+from liscopelens.checker import *
+from liscopelens.utils.graph import *
+from liscopelens.utils.structure import *
+from liscopelens.parser import *
 
 
 class TestLicense(unittest.TestCase):
@@ -214,8 +214,8 @@ class TestParser(unittest.TestCase):
 
     def test_compatible_parser(self):
         import json
-        from lict.parser.compatible import BaseCompatiblityParser
-        from lict.parser.scancode import ScancodeParser
+        from liscopelens.parser.compatible import BaseCompatiblityParser
+        from liscopelens.parser.scancode import ScancodeParser
 
         ScancodeParser(argparse.Namespace(scancode_file="../lict_exp/test.json"), config=load_config()).parse(
             "test", GraphManager()
@@ -227,7 +227,7 @@ class TestTest(unittest.TestCase):
     warnings.filterwarnings("ignore")
 
     def test_Test_parser(self):
-        from lict.parser.Test_parser.Test_parser import TestParser
+        from liscopelens.parser.Test_parser.Test_parser import TestParser
 
         # TestParser(argparse.Namespace(scancode_file="../lict_exp/test.json")).parse("test", GraphManager())
         config = Config.from_toml(path="lict/config/default.toml")

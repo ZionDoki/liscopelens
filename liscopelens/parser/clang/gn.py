@@ -20,11 +20,11 @@ import json
 
 from typing import Optional
 
-from lict.parser.base import BaseParser
-from lict.utils.graph import GraphManager
-
-
 from rich.progress import track
+
+from liscopelens.parser.base import BaseParser
+from liscopelens.utils.graph import GraphManager
+
 
 
 class GnParser(BaseParser):

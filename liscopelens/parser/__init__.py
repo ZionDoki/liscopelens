@@ -16,17 +16,7 @@
 # limitations under the License.
 #
 
-from .query import QueryParser
+from .clang.entry import CParserEntry
+from .inspector.entry import QueryEntry
 
-
-from ..base import BaseParserEntry
-
-
-from ..user_parser.echo import EchoPaser
-
-
-class QueryEntry(BaseParserEntry):
-    parsers = (QueryParser,)
-
-    entry_name: str = "query"
-    entry_help: str = "This parser is used to query the results of the others parser"
+PARSER_ENTRIES = {"clang": CParserEntry, "inspect": QueryEntry}

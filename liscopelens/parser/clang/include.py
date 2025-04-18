@@ -20,9 +20,11 @@ import os
 import re
 import warnings
 
-from lict.parser.base import BaseParser
-from lict.utils.graph import GraphManager
-from lict.utils.scaffold import extract_folder_name
+from typing import Optional
+
+from liscopelens.parser.base import BaseParser
+from liscopelens.utils.graph import GraphManager
+from liscopelens.utils.scaffold import extract_folder_name
 
 
 class IncludeParser(BaseParser):
@@ -49,7 +51,7 @@ class IncludeParser(BaseParser):
                     included_file = match_two.group(1)
                     included_two.append(included_file)
             return included_one, included_two
-        except Exception as e:
+        except re.error as e:
             print(e)
 
     @staticmethod
@@ -71,7 +73,7 @@ class IncludeParser(BaseParser):
         absolute_dependency_path = os.path.abspath(absolute_dependency_path)
         return absolute_dependency_path
 
-    def ParseC(self, file_content: list) -> tuple[list[str], list[str]]:
+    def parse_clang(self, file_content: list) -> tuple[list[str], list[str]]:
         """
         Process files and call parse_includes or parse_cmake based on different file names.
         Args:
@@ -83,14 +85,14 @@ class IncludeParser(BaseParser):
                     - included_One (list[str]): list of included files(<>).
                     - included_Two (list[str]): list of included files("").
         """
-        print("现在处理的是.c.h文件")
+        print("Parsing .c or .h file...")
         return self.parse_includes(file_content)
 
-    def parse(self, project_path: str, context: GraphManager) -> GraphManager:
+    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
         root_vertex = self.create_vertex(project_path)
         context.add_node(root_vertex)
         if self.args.root_path is None:
-            warnings("can not find root path")
+            warnings.warn("can not find root path")
         else:
             print(self.args.root_path)
         for root, dirs, files in os.walk(self.args.root_path):
@@ -116,7 +118,7 @@ class IncludeParser(BaseParser):
                 sub_edge = self.create_edge(root, subdir_path, label="sub")
                 context.add_edge(sub_edge)
         for v in self.vertex_parser:
-            includeone, includetwo = self.ParseC(v["content"])
+            includeone, includetwo = self.parse_clang(v["content"])
             for file in includeone:
                 vertex = self.create_vertex(file)
                 context.add_node(vertex)
@@ -142,7 +144,7 @@ class IncludeParser(BaseParser):
                             find_flags = 1
                             break
                     if not find_flags:
-                        print("外部依赖")
+                        print("external dependency")
                         edge = self.create_edge(v.label, file, label="include" " external")
                         context.add_edge(edge)
                         print(v.label + "---------->" + file)

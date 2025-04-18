@@ -16,12 +16,4 @@
 # limitations under the License.
 #
 
-from typing import Type
-from .Test_parser import TestParser
-from lict.parser.base import BaseParser, BaseParserEntry
-
-
-class TestParserEntry(BaseParserEntry):
-    parsers: tuple[Type[BaseParser]] = (TestParser,)
-
-    entry_help: str = "TestParser,this parser is used to generate test data."
+from .query import *

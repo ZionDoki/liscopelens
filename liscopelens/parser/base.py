@@ -24,8 +24,8 @@ import warnings
 from typing import Any, Dict, Tuple, Optional, Type
 
 from abc import ABC, abstractmethod
-from lict.utils.graph import GraphManager, Vertex, Edge
-from lict.utils.structure import Config
+from liscopelens.utils.graph import GraphManager, Vertex, Edge
+from liscopelens.utils.structure import Config
 
 
 class BaseParser(ABC):
@@ -93,15 +93,13 @@ class BaseParserEntry:
 
         self._parsers = (p(args, config) for p in self.parsers)
 
-    @abstractmethod
-    def parse(self, project_path: str, context: Optional[GraphManager] = None, args: argparse.Namespace | None = None):
+    def parse(self, project_path: str, context: Optional[GraphManager] = None):
         """
         Parse the arguments and update the context
 
         Args:
             - project_path: The path of the project
             - context: The context (GraphManager) of the project
-            - args: The parsed arguments, all parsers in the same entry will share the same arguments
 
         Returns:
             - None, but any return could add when inheriting this class.

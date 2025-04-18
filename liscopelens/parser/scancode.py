@@ -20,12 +20,17 @@ import os
 import re
 import json
 import argparse
+
+from typing import Optional
+
 from rich.progress import track
 
-from .base import BaseParser
-from lict.checker import Checker
-from lict.utils.graph import GraphManager
-from lict.utils.structure import DualLicense, SPDXParser, Config
+from liscopelens.checker import Checker
+from liscopelens.utils.graph import GraphManager
+from liscopelens.utils.structure import DualLicense, SPDXParser, Config
+
+
+from liscopelens.parser.base import BaseParser
 
 
 class ScancodeParser(BaseParser):
@@ -82,12 +87,12 @@ class ScancodeParser(BaseParser):
         """
         if context is None:
             raise ValueError(f"Context can not be None in {self.__class__.__name__}.")
-        with open(json_path, "r") as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             scancode_results = json.load(f)
         spdx = SPDXParser()
         for key, values in scancode_results.items():
-            license = spdx(values)
-            context.modify_node_attribute(key, "licenses", license)
+            spdx_license = spdx(values)
+            context.modify_node_attribute(key, "licenses", spdx_license)
         return context
 
     def remove_ref_lang(self, spdx_id: str) -> str:
@@ -113,7 +118,7 @@ class ScancodeParser(BaseParser):
         else:
             rel_path = None
 
-        with open(json_path, "r") as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             scancode_results = json.load(f)
 
             for detects in scancode_results["license_detections"]:
@@ -143,7 +148,7 @@ class ScancodeParser(BaseParser):
 
                     self.add_license(context, file_path, spdx_results, file["detected_license_expression_spdx"] + "_f")
 
-    def parse(self, project_path: str, context: GraphManager) -> GraphManager:
+    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
         """
         The path of the scancode's output is relative path, whatever you pass absolute path or relative path.
 
@@ -174,7 +179,7 @@ class ScancodeParser(BaseParser):
                     set(node[0] for node in context.nodes(data=True) if node[1].get("type", None) == "code")
                     - self.count
                 ),
-                open("scancode.json", "w"),
+                open("scancode.json", "w", encoding="utf-8"),
             )
         else:
             raise ValueError("The path of the scancode's output is not provided.")

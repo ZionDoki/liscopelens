@@ -54,7 +54,7 @@ class Vertex(dict):
 
     def _filter(self, kwargs):
         """filter the None value in the kwargs."""
-        return {k: v for k, v in kwargs.items() if v != None}
+        return {k: v for k, v in kwargs.items() if v is not None}
 
 
 class Edge(dict):
@@ -82,7 +82,7 @@ class Edge(dict):
 
     def _filter(self, kwargs):
         """filter the None value in the kwargs."""
-        return {k: v for k, v in kwargs.items() if v != None}
+        return {k: v for k, v in kwargs.items() if v is not None}
 
 
 class Triple:
@@ -149,7 +149,7 @@ class GraphManager:
 
     @property
     def leaf_nodes(self) -> list:
-        if self._leaf_nodes == None:
+        if self._leaf_nodes is None:
             self._leaf_nodes = [node for node in self.graph.nodes if self.graph.out_degree(node) == 0]
         return self._leaf_nodes
 
@@ -315,13 +315,29 @@ class GraphManager:
         return [u for u, v, data in self.graph.in_edges(node_label, data=True) if data.get("type") == edge_type]
 
     def edge_subgraph(self, edges: list[EdgeIndex]) -> "GraphManager":
-        """ """
+        """
+        edge subgraph of the graph.
+        
+        Args:
+            edges (list[EdgeIndex]): the edge index list that need to be subgraph.
+        
+        Returns:
+            GraphManager: the subgraph of the graph.
+        """
         new_graph = GraphManager()
         new_graph.graph = self.graph.edge_subgraph(edges)
         return new_graph
 
-    def node_subgraph(self, nodes: list[str]):
-        """ """
+    def node_subgraph(self, nodes: list[str]) -> "GraphManager":
+        """
+        node subgraph of the graph.
+
+        Args:
+            nodes (list[str]): the node label list that need to be subgraph.
+
+        Returns:
+            GraphManager: the subgraph of the graph.
+        """
         new_graph = GraphManager()
         new_graph.graph = self.graph.subgraph(nodes)
         return new_graph
@@ -552,9 +568,9 @@ class GraphManager:
         # Find sibling pairs
         for children in parent_to_children.values():
             if len(children) > 1:
-                for i in range(len(children)):
-                    for j in range(i + 1, len(children)):
-                        sibling_pairs.append((children[i], children[j]))
+                for idx, child in enumerate(children):
+                    for sibling in children[idx + 1:]:
+                        sibling_pairs.append((child, sibling))
 
         return sibling_pairs
 

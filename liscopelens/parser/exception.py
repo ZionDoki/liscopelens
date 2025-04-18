@@ -26,9 +26,9 @@ from argparse import Namespace
 
 from typing import Optional
 
-from lict.checker import Checker
-from lict.utils.graph import GraphManager, Edge
-from lict.utils.structure import Config, load_licenses, load_exceptions
+from liscopelens.checker import Checker
+from liscopelens.utils.graph import GraphManager, Edge
+from liscopelens.utils.structure import Config, load_licenses, load_exceptions
 
 from .base import BaseParser
 
