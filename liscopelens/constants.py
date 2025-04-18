@@ -28,7 +28,7 @@ from enum import StrEnum, IntEnum
 class Settings(StrEnum):
     """configurations of the project."""
 
-    PACKAGE_NAME = "lict"
+    PACKAGE_NAME = "liscopelens"
     RESOURCE_NAME = "resources"
     LICENSE_PROPERTY_GRAPH = "properties_graph"
     LICENSE_COMPATIBLE_GRAPH = "compatible_graph"

@@ -83,7 +83,7 @@ class BaseParserEntry:
 
     def __init__(self, args: argparse.Namespace, config: Config):
         """
-        when user input the command lict [entry_name] hit the enter key, the parser will be initialized.
+        when user input the command liscopelens [entry_name] hit the enter key, the parser will be initialized.
         """
         if self.parsers is None:
             raise NotImplementedError("No parsers found")

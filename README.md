@@ -26,7 +26,7 @@
 
 ## 快速开始
 
-当前版本仅支持面向 OpenHarmony 的兼容性检测，欢迎使用面向 OpenHarmony 全量源码仓的一键检测脚本 [LictOneClick](https://gitee.com/zionmoe/lict-one-click)。
+当前版本仅支持面向 OpenHarmony 的兼容性检测，欢迎使用面向 OpenHarmony 全量源码仓的一键检测脚本 [LictOneClick](https://gitee.com/zionmoe/liscopelens-one-click)。
 
 ## 安装教程
 
@@ -36,10 +36,10 @@
 
 ## 使用说明
 
-确保工具安装后，终端输入指令 `lict --help`
+确保工具安装后，终端输入指令 `liscopelens --help`
 
 ```shell
-usage: lict [-h] [-c CONFIG] {sbom,cpp} ...
+usage: liscopelens [-h] [-c CONFIG] {sbom,cpp} ...
 
 部件兼容性分析工具
 
@@ -62,15 +62,15 @@ options:
     `./build.sh --product-name {设备形态} --gn-flags="--ide=json" --gn-flags="--json-file-name=out.json"`
 3. 确保在源码根目录下具有`OpenHarmony/out/{设备形态}/out.json` 存在
 4. 使用 Scancode 扫描 OpenHarmony 许可证
-5. 执行 lict 进行兼容性扫描
+5. 执行 liscopelens 进行兼容性扫描
     ```shell
-    lict cpp --gn_file OpenHarmony/out/{设备形态}/out.json --scancode-file path/to/scancode-res.json --output ./output
+    liscopelens cpp --gn_file OpenHarmony/out/{设备形态}/out.json --scancode-file path/to/scancode-res.json --output ./output
     ```
 1. 查看 `output/results.json` 或则借助[审查工具](#审查结果)
 
-其他参数可以，查看帮助 `lict cpp -h`，解释如下：
+其他参数可以，查看帮助 `liscopelens cpp -h`，解释如下：
 ```shell
-usage: lict cpp [-h] (--gn_tool GN_TOOL | --gn_file GN_FILE)
+usage: liscopelens cpp [-h] (--gn_tool GN_TOOL | --gn_file GN_FILE)
                 (--scancode-file SCANCODE_FILE | --scancode-dir SCANCODE_DIR) [--rm-ref-lang] [--save-kg]
                 [--ignore-unk] [--out-gml OUT_GML] [--echo] [--out-echo OUT_ECHO]
 
@@ -173,10 +173,10 @@ export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 
 ## 审查结果
 
-执行完成后审查冲突结果（请确保传入输出位置参数 `lict <command> ... --output path/to/output_dir`）
+执行完成后审查冲突结果（请确保传入输出位置参数 `liscopelens <command> ... --output path/to/output_dir`）
 
 ```shell
-lict query /path/to/output_dir
+liscopelens query /path/to/output_dir
 ```
 
 ![query演示](assets/example.gif)

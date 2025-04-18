@@ -23,7 +23,7 @@ Although we strive to ensure the accuracy and reliability of this tool, **the re
 
 ## Quick Start
 
-The current version only supports compatibility checks for OpenHarmony. You are welcome to use the one-click detection script [LictOneClick](https://gitee.com/zionmoe/lict-one-click) for the full OpenHarmony source repository.
+The current version only supports compatibility checks for OpenHarmony. You are welcome to use the one-click detection script [LSLOneClick](https://gitee.com/zionmoe/lict-one-click) for the full OpenHarmony source repository.
 
 ## Installation Guide
 
@@ -33,10 +33,10 @@ The current version only supports compatibility checks for OpenHarmony. You are 
 
 ## Usage Instructions
 
-After ensuring the tool is installed, enter the command `lict --help` in the terminal.
+After ensuring the tool is installed, enter the command `liscopelens --help` in the terminal.
 
 ```shell
-usage: lict [-h] [-c CONFIG] {sbom,cpp} ...
+usage: liscopelens [-h] [-c CONFIG] {sbom,cpp} ...
 
 Component Compatibility Analysis Tool
 
@@ -61,15 +61,15 @@ options:
     ```
 3. Ensure that `OpenHarmony/out/{device_form}/out.json` exists in the root directory of the source code.
 4. Use Scancode to scan OpenHarmony licenses.
-5. Execute `lict` for compatibility scanning:
+5. Execute `liscopelens` for compatibility scanning:
     ```shell
-    lict cpp --gn_file OpenHarmony/out/{device_form}/out.json --scancode-file path/to/scancode-res.json --output ./output
+    liscopelens cpp --gn_file OpenHarmony/out/{device_form}/out.json --scancode-file path/to/scancode-res.json --output ./output
     ```
 6. View `output/results.json` or use the [Review Tool](#review-results).
 
-For additional parameters, check the help with `lict cpp -h`. The explanation is as follows:
+For additional parameters, check the help with `liscopelens cpp -h`. The explanation is as follows:
 ```shell
-usage: lict cpp [-h] (--gn_tool GN_TOOL | --gn_file GN_FILE)
+usage: liscopelens cpp [-h] (--gn_tool GN_TOOL | --gn_file GN_FILE)
                 (--scancode-file SCANCODE_FILE | --scancode-dir SCANCODE_DIR) [--rm-ref-lang] [--save-kg]
                 [--ignore-unk] [--out-gml OUT_GML] [--echo] [--out-echo OUT_ECHO]
 
@@ -169,10 +169,10 @@ export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 
 ## Review Results
 
-After execution, review conflict results (ensure to pass the output path parameter `lict <command> ... --output path/to/output_dir`).
+After execution, review conflict results (ensure to pass the output path parameter `liscopelens <command> ... --output path/to/output_dir`).
 
 ```shell
-lict query /path/to/output_dir
+liscopelens query /path/to/output_dir
 ```
 
 ![Query Demonstration](assets/example.gif)
@@ -186,7 +186,7 @@ Refer to the [Design Document](doc/设计文档.md#开发手册) for more detail
 To reproduce the results of the CASE STUDY in this work, please obtain the source code of [OpenHarmony 5.0 beta version](https://gitcode.com/openharmony/docs/blob/OpenHarmony-5.0-Beta1/en/release-notes/OpenHarmony-v5.0-beta1.md#source-code-acquisition).  
 After that, you can use our one-click script for verification:  
 
-[https://gitee.com/zionmoe/lict-one-click](https://gitee.com/zionmoe/lict-one-click) 
+[https://gitee.com/zionmoe/liscopelens-one-click](https://gitee.com/zionmoe/liscopelens-one-click) 
 
 The license risk modification results confirmed by this work can be found at:
 

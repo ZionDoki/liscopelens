@@ -230,12 +230,12 @@ class TestTest(unittest.TestCase):
         from liscopelens.parser.Test_parser.Test_parser import TestParser
 
         # TestParser(argparse.Namespace(scancode_file="../lict_exp/test.json")).parse("test", GraphManager())
-        config = Config.from_toml(path="lict/config/default.toml")
+        config = Config.from_toml(path="liscopelens/config/default.toml")
         context = TestParser(
-            argparse.Namespace(user_config_file="lict/config/user_config.toml", init_file="lict/resources/test_template.gml", results="results"),
+            argparse.Namespace(user_config_file="liscopelens/config/user_config.toml", init_file="liscopelens/resources/test_template.gml", results="results"),
             config=config).parse("test", GraphManager())
 
-        # from lict.parser.compatible import BaseCompatiblityParser
+        # from liscopelens.parser.compatible import BaseCompatiblityParser
         # context = BaseCompatiblityParser(argparse.Namespace(),config=config).parse("test",context)
         # context.save("answer.gml")
 
@@ -246,7 +246,7 @@ class TempTest(unittest.TestCase):
         exceptions = load_exceptions()
         licenses = load_licenses()
 
-        graph = GraphManager("lict/resources/compatible_graph.gml")
+        graph = GraphManager("liscopelens/resources/compatible_graph.gml")
         edge = graph.query_edge_by_label("GPL-2.0-only", "GPL-3.0-or-later-with-Bison-exception-2.2")
         print(edge)
         print(graph.get_edge_data(edge[0]))
