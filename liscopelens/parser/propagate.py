@@ -318,24 +318,24 @@ class BasePropagateParser(BaseParser):
             for sub in nx.weakly_connected_components(context.graph):
                 for current_node, _, children in self.generate_processing_sequence(context.graph.subgraph(sub).copy()):
 
-                    if license_groups := context.nodes[current_node].get("licenses"):
+                    if license_groups := context.nodes()[current_node].get("licenses"):
                         current_outbound = license_groups
                     else:
                         current_outbound = None
 
-                    current_condition = self.parse_condition(context.nodes[current_node].get("type", None))
+                    current_condition = self.parse_condition(context.nodes()[current_node].get("type", None))
 
                     if current_condition in self.config.license_isolations:
-                        context.nodes[current_node]["license_isolation"] = True
+                        context.nodes()[current_node]["license_isolation"] = True
 
                     for child in children:
 
-                        dual_lic = context.nodes[child].get("outbound", None)
+                        dual_lic = context.nodes()[child].get("outbound", None)
 
                         if not dual_lic:
                             continue
 
-                        if child_outbound := context.nodes[child].get("outbound", None):
+                        if child_outbound := context.nodes()[child].get("outbound", None):
                             if not current_outbound:
                                 current_outbound = child_outbound
                             current_outbound = child_outbound & current_outbound
@@ -344,10 +344,10 @@ class BasePropagateParser(BaseParser):
                         progress.update(task, advance=1)
                         continue
 
-                    context.nodes[current_node]["before_check"] = current_outbound
+                    context.nodes()[current_node]["before_check"] = current_outbound
                     # current_outbound = current_outbound.add_condition(current_condition)
                     outbound = self.get_outbound(current_outbound, current_condition)
-                    context.nodes[current_node]["outbound"] = outbound
+                    context.nodes()[current_node]["outbound"] = outbound
 
                     progress.update(task, advance=1)
 

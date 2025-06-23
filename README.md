@@ -34,6 +34,8 @@
 1. clone 仓库
 2. 进入仓库根目录 `pip install .`
 
+**如果安装过 lict 版本，请先卸载旧版**
+
 ## 使用说明
 
 确保工具安装后，终端输入指令 `liscopelens --help`

@@ -237,7 +237,7 @@ class BaseCompatiblityParser(BaseParser):
                     context.graph.subgraph(sub).copy()
                 ):
 
-                    dual_before_check = context.nodes[current_node].get("before_check", None)
+                    dual_before_check = context.nodes()[current_node].get("before_check", None)
 
                     if dual_before_check is None:
                         progress.update(task, advance=1)
@@ -247,7 +247,7 @@ class BaseCompatiblityParser(BaseParser):
                         dual_before_check, blacklist=blacklist, ignore_unk=ignore_unk
                     )
 
-                    current_outbound = context.nodes[current_node].get("outbound", None)
+                    current_outbound = context.nodes()[current_node].get("outbound", None)
 
                     new_pattern_flag, parent_conflict_flag = True, False
                     new_pattern = conflicts.copy()
@@ -258,7 +258,7 @@ class BaseCompatiblityParser(BaseParser):
                         if not current_outbound:
                             break
 
-                        conflict_group = context.nodes[parent].get("conflict_group", None)
+                        conflict_group = context.nodes()[parent].get("conflict_group", None)
                         if conflict_group is None:
                             continue
 
@@ -268,8 +268,8 @@ class BaseCompatiblityParser(BaseParser):
 
                             # _ here to check if current node has contribution to the conflict then add conflict_id to it
                             if self.is_conflict_happened(dual_after_check, conflict_pattern):
-                                context.nodes[current_node]["conflict_group"] = (
-                                    context.nodes[current_node].get("conflict_group", set()).union({conflict_id})
+                                context.nodes()[current_node]["conflict_group"] = (
+                                    context.nodes()[current_node].get("conflict_group", set()).union({conflict_id})
                                 )
 
                             if dual_after_check:
@@ -279,8 +279,8 @@ class BaseCompatiblityParser(BaseParser):
                             new_pattern = set([conflict for conflict in new_pattern if conflict not in conflict_pattern])
 
                             if len(new_pattern) != len(conflicts):
-                                context.nodes[current_node]["conflict_group"] = (
-                                    context.nodes[current_node].get("conflict_group", set()).union({conflict_id})
+                                context.nodes()[current_node]["conflict_group"] = (
+                                    context.nodes()[current_node].get("conflict_group", set()).union({conflict_id})
                                 )
 
                             if not new_pattern:
@@ -299,8 +299,8 @@ class BaseCompatiblityParser(BaseParser):
                                 break
 
                         conflicts_table[uuid] = conflicts
-                        context.nodes[current_node]["conflict_group"] = {uuid}
-                        context.nodes[current_node]["first"] = True
+                        context.nodes()[current_node]["conflict_group"] = {uuid}
+                        context.nodes()[current_node]["first"] = True
 
                     elif new_pattern_flag:
 
@@ -311,8 +311,8 @@ class BaseCompatiblityParser(BaseParser):
                                 break
 
                         conflicts_table[uuid] = new_pattern
-                        context.nodes[current_node]["conflict_group"] = (
-                            context.nodes[current_node].get("conflict_group", set({})).union({uuid})
+                        context.nodes()[current_node]["conflict_group"] = (
+                            context.nodes()[current_node].get("conflict_group", set({})).union({uuid})
                         )
 
                     progress.update(

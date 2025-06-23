@@ -31,6 +31,8 @@ The current version only supports compatibility checks for OpenHarmony. You are 
 1. Clone the repository.
 2. Navigate to the repository's root directory and run `pip install .`
 
+**If you have installed a `lict` version before, please uninstall the old version first.**
+
 ## Usage Instructions
 
 After ensuring the tool is installed, enter the command `liscopelens --help` in the terminal.
@@ -91,19 +93,19 @@ options:
 
 #### Parameter List
 
-| Parameter         | Type | Description                                                     | Required |
-| ----------------- | ---- | --------------------------------------------------------------- | -------- |
-| cpp               | bool | Indicates detection of a C/C++ code repository                   | Yes      |
-| --gn_tool         | str  | Path to the executable GN tool                                   | Yes      |
-| --gn_file         | str  | Path to the GN dependency graph output file                      | Yes      |
-| --scancode-file   | str  | Path to the Scancode output in JSON format                       | Yes      |
-| --scancode-dir    | str  | Path to the directory containing JSON files                        | Yes      |
-| --rm-ref-lang     | bool | Automatically remove Scancode reference prefix and language suffix from SPDX IDs | No       |
-| --save-kg         | bool | Save the new knowledge graph after parsing                        | No       |
-| --ignore-unk      | bool | Ignore unknown licenses                                           | No       |
-| --out-gml         | str  | Output path for the graph                                         | No       |
-| --echo            | bool | Echo the final result of compatibility checking                    | No       |
-| --out-echo        | str  | Output path for the echo result                                   | No       |
+| Parameter       | Type | Description                                                                      | Required |
+| --------------- | ---- | -------------------------------------------------------------------------------- | -------- |
+| cpp             | bool | Indicates detection of a C/C++ code repository                                   | Yes      |
+| --gn_tool       | str  | Path to the executable GN tool                                                   | Yes      |
+| --gn_file       | str  | Path to the GN dependency graph output file                                      | Yes      |
+| --scancode-file | str  | Path to the Scancode output in JSON format                                       | Yes      |
+| --scancode-dir  | str  | Path to the directory containing JSON files                                      | Yes      |
+| --rm-ref-lang   | bool | Automatically remove Scancode reference prefix and language suffix from SPDX IDs | No       |
+| --save-kg       | bool | Save the new knowledge graph after parsing                                       | No       |
+| --ignore-unk    | bool | Ignore unknown licenses                                                          | No       |
+| --out-gml       | str  | Output path for the graph                                                        | No       |
+| --echo          | bool | Echo the final result of compatibility checking                                  | No       |
+| --out-echo      | str  | Output path for the echo result                                                  | No       |
 
 #### gn Dependency Graph Format
 

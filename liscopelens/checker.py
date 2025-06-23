@@ -66,7 +66,7 @@ class Checker:
         """
         # * because the node may return {}, only return is None we can sure the node is not exist
 
-        return self.properties_graph.nodes.get(license_name) is not None
+        return self.properties_graph.query_node_by_label(license_name) is not None
 
     def is_copyleft(self, license_name: str) -> bool:
         """

@@ -474,7 +474,7 @@ class GraphManager:
         for node in filter(lambda x: self._compare_node(x[1], kwargs), self.graph.nodes(data=True)):
             yield node[0], node[1]
 
-    def modify_node_attribute(self, node_label: str, new_attribute: str, new_value: Any):
+    def modify_node_attribute(self, node_label: str, new_attribute: str, new_value: Any) -> bool:
         """
         Modify the attribute of a node in the graph.
 
@@ -483,15 +483,18 @@ class GraphManager:
             node_label (str): The label of the node to be modified.
             new_attribute (str): The name of the new attribute to be added or modified.
             new_value (Any): The value of the new attribute.
+
+        Returns:
+            bool: True if the node was found and modified, False otherwise.
         """
         target_node = self.query_node_by_label(node_label)
         if target_node:
             target_node[new_attribute] = new_value
             nx.set_node_attributes(self.graph, {node_label: target_node})
 
-            return self
+            return True
         else:
-            raise ValueError(f"Node with label '{node_label}' not found in the graph.")
+            return False
 
     def get_subgraph_depth(self, start_node: Optional[str] = None, depth=2, leaf_flag=True):
         """
