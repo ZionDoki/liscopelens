@@ -274,7 +274,7 @@ class HvigorProjectParser(BaseParser):
         # Create node with original config fields preserved with prefixes
         project_node = self.create_vertex(
             project_label,
-            type="project",
+            type="compile",
             name=project_dir_name,
             path=str(self.project_root),
             parser_stage="stage_one"
@@ -307,9 +307,15 @@ class HvigorProjectParser(BaseParser):
         module_name = module_data['name']
         module_label = self._normalize_path(f"{self.project_root.name}/{module_name}")
         
+        # Determine module type based on whether it's native
+        if module_data['is_native']:
+            module_type = "shared_library"
+        else:
+            module_type = "compile"
+        
         module_node = self.create_vertex(
             module_label,
-            type="module",
+            type=module_type,
             name=module_name,
             is_native=module_data['is_native'],
             path=str(module_data['path']),
@@ -390,7 +396,7 @@ class HvigorProjectParser(BaseParser):
                 external_label = self._normalize_path(f"external/{dep_name}")
                 external_node = self.create_vertex(
                     external_label,
-                    type="external_library",
+                    type="shared_library",
                     name=dep_name,
                     oh_package_version=dep_version,
                     source="external"
@@ -434,7 +440,7 @@ class HvigorProjectParser(BaseParser):
                 external_label = self._normalize_path(f"external/{dep_name}")
                 external_node = self.create_vertex(
                     external_label,
-                    type="external_library",
+                    type="shared_library",
                     name=dep_name,
                     oh_package_version=dep_version,
                     source="external"

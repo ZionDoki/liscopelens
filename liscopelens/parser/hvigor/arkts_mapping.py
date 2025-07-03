@@ -116,7 +116,8 @@ class HvigorArkTSMappingParser(BaseParser):
         """
         module_nodes = []
         for node_id, node_data in context.nodes(data=True):
-            if node_data.get("type") == "module":
+            # Include both regular modules and native modules (shared_library)
+            if node_data.get("type") in ["module", "shared_library"]:
                 module_nodes.append({"id": node_id, "data": node_data})
         return module_nodes
 
@@ -284,10 +285,10 @@ class HvigorArkTSMappingParser(BaseParser):
             f"{self.project_name}/{file_info['module_name']}/{file_info['relative_path']}"
         )
 
-        # Create file node
+        # Create file node - all files are code type
         file_node = self.create_vertex(
             file_label,
-            type="file",
+            type="code",
             name=file_info["name"],
             file_type=file_info["file_type"],
             language=file_info["language"],

@@ -26,7 +26,6 @@ import subprocess
 import zipfile
 import tarfile
 from pathlib import Path
-from urllib.parse import urljoin
 
 from typing import Optional
 from collections import defaultdict
@@ -313,7 +312,7 @@ class ScancodeParser(BaseParser):
         # Check if version_dir exists and find the actual extracted directory
         if version_dir.exists():
             # Look for scancode executable in version_dir and its subdirectories
-            for root, dirs, files in os.walk(version_dir):
+            for root, _, _ in os.walk(version_dir):
                 root_path = Path(root)
                 for exe_name in ["scancode", "scancode.exe", "scancode.bat"]:
                     exe_path = root_path / exe_name
@@ -364,7 +363,7 @@ class ScancodeParser(BaseParser):
             
             # Extract
             if not self._extract_scancode(archive_path, version_dir):
-                raise FileNotFoundError(f"Failed to extract scancode archive")
+                raise FileNotFoundError("Failed to extract scancode archive")
             
             # Clean up archive
             archive_path.unlink()
@@ -381,14 +380,12 @@ class ScancodeParser(BaseParser):
                             self._initialize_scancode(exe_path, init_flag_file)
                             return exe_path
             
-            # Fallback to possible paths
             for exe_path in possible_paths:
                 if exe_path.exists():
-                    # Initialize scancode after first installation
                     self._initialize_scancode(exe_path, init_flag_file)
                     return exe_path
             
-            raise FileNotFoundError(f"Scancode executable not found after installation")
+            raise FileNotFoundError("Scancode executable not found after installation")
             
         except Exception as e:
             error_msg = (
@@ -396,7 +393,7 @@ class ScancodeParser(BaseParser):
                 f"Please check if the --scancode-ver and --python-ver parameters are correct. "
                 f"Error: {e}"
             )
-            raise FileNotFoundError(error_msg)
+            raise FileNotFoundError(error_msg) from e
     
     def _run_scancode_scan(self, target_path: str) -> str:
         """
@@ -476,18 +473,14 @@ class ScancodeParser(BaseParser):
         except subprocess.CalledProcessError as e:
             error_msg = f"Scancode scan failed with return code {e.returncode}"
             print(f"✗ {error_msg}")
-            raise RuntimeError(error_msg)
+            raise RuntimeError(error_msg) from e
         except Exception as e:
             error_msg = f"Scancode scan failed: {e}"
             print(f"✗ {error_msg}")
-            raise RuntimeError(error_msg)
+            raise RuntimeError(error_msg) from e
 
     def add_license(self, context: GraphManager, file_path: str, spdx_results: DualLicense, test):
         parent_label = "//" + file_path.replace("\\", "/")
-
-        if file_path == "ffmpeg_harmony_os/ffmpeg/src/main/cpp/thirdparty/fribidi/arm64-v8a/include/fribidi/fribidi-joining-types.h":
-            print (111111111111111111111111, parent_label)
-
         context_node = context.query_node_by_label(parent_label)
 
         if context_node and spdx_results:

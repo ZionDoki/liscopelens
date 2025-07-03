@@ -8,7 +8,9 @@ permissive_spreads = ["COMPILE", "STATIC_LINKING"]
 
 [literal_mapping]
 code = "COMPILE"
+compile = "COMPILE"
 shared_library = "DYNAMIC_LINKING"
 static_library = "STATIC_LINKING"
 executable = "EXECUTABLE"
 generated_file = "GENERATED"
+module = "COMPILE"

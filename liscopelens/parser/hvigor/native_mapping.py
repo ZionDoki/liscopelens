@@ -117,7 +117,9 @@ class HvigorNativeMappingParser(BaseParser):
         """
         module_nodes = []
         for node_id, node_data in context.nodes(data=True):
-            if node_data.get("type") == "module" and node_data.get("is_native", False):
+            # Native modules now have type "shared_library" or still have is_native flag
+            if (node_data.get("type") == "shared_library" or
+                (node_data.get("type") == "module" and node_data.get("is_native", False))):
                 module_nodes.append({"id": node_id, "data": node_data})
         return module_nodes
 
@@ -299,10 +301,23 @@ class HvigorNativeMappingParser(BaseParser):
             f"{self.project_name}/{file_info['module_name']}/{file_info['relative_path']}"
         )
 
+        # Determine node type based on file type and extension
+        if file_info["file_type"] == "library":
+            # For library files, determine static vs shared based on extension
+            if file_info["extension"] in {".a", ".lib"}:
+                node_type = "static_library"
+            elif file_info["extension"] in {".so", ".dll"}:
+                node_type = "shared_library"
+            else:
+                node_type = "shared_library"  # Default for libraries
+        else:
+            # All other files are code type
+            node_type = "code"
+        
         # Create file node
         file_node = self.create_vertex(
             file_label,
-            type="file",
+            type=node_type,
             name=file_info["name"],
             file_type=file_info["file_type"],
             language=file_info["language"],
