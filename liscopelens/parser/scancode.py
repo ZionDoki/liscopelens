@@ -23,8 +23,11 @@ import argparse
 import fnmatch
 
 from typing import Optional
+from collections import defaultdict
 
+from rich.table import Table
 from rich.progress import track
+from rich.console import Console
 
 from liscopelens.checker import Checker
 from liscopelens.utils.graph import GraphManager
@@ -75,25 +78,54 @@ class ScancodeParser(BaseParser):
             context_node["test"] = test
             self.count.add(parent_label)
 
-    def _apply_shadow_licenses(self, context: GraphManager, shadow_patterns: dict[str, str]):
+    def _report_shadow_license_stats(self, license_usage: dict[str, set[str]]):
         """
-        apply shadow licenses to nodes in the context based on wildcard patterns.
-        
-        Args:
-            context: GraphManager instance containing the nodes
-            shadow_patterns: shadow patterns in the form of a dictionary
+        Print a rich table summary of shadow license application results.
+        """
+        if not license_usage:
+            print("[bold red]No shadow licenses applied.[/bold red]")
+            return
+
+        console = Console()
+        table = Table(title="Shadow License Application Summary")
+        table.add_column("License", style="cyan", no_wrap=True)
+        table.add_column("Node Count", style="green", justify="right")
+        table.add_column("Example Nodes (max 3)", style="magenta")
+
+        total = 0
+        for license_str, nodes in license_usage.items():
+            total += len(nodes)
+            examples = ", ".join(list(nodes)[:3])
+            table.add_row(license_str, str(len(nodes)), examples)
+
+        console.print(table)
+        console.print(f"[bold yellow]Total Nodes Modified:[/bold yellow] {total}")
+
+    def _apply_shadow_licenses(
+        self,
+        context: GraphManager,
+        shadow_patterns: dict[str, str]
+    ) -> dict[str, set[str]]:
+        """
+        Apply shadow licenses using wildcard patterns, and return stats.
+
+        Returns:
+            A dict mapping license string -> set of node IDs
         """
         spdx = SPDXParser()
-        
+        license_usage = defaultdict(set)
+
         for node_id, node_data in context.nodes(data=True):
             if node_data.get("type") == "code":
                 for pattern, license_str in shadow_patterns.items():
-                    if fnmatch.fnmatch(pattern, node_id):
+                    if fnmatch.fnmatch(node_id, pattern):
                         spdx_license = spdx(license_str)
                         if spdx_license:
                             context.modify_node_attribute(node_id, "licenses", spdx_license)
-                            print(f"Applied shadow license '{license_str}' to '{node_id}' (matched pattern: '{pattern}')")
+                            license_usage[license_str].add(node_id)
                         break
+
+        return license_usage
 
     def parse_shadow(self, json_path: str, context: GraphManager):
         """
@@ -113,29 +145,34 @@ class ScancodeParser(BaseParser):
         """
         if context is None:
             raise ValueError(f"Context can not be None in {self.__class__.__name__}.")
-        
+
         with open(json_path, "r", encoding="utf-8") as f:
             shadow_rules = json.load(f)
-        
+
         direct_matches = {}
         wildcard_patterns = {}
-        
+
         for pattern, license_str in shadow_rules.items():
             if '*' in pattern or '?' in pattern or '[' in pattern:
                 wildcard_patterns[pattern] = license_str
             else:
                 direct_matches[pattern] = license_str
-        
+
         spdx = SPDXParser()
+        license_usage = defaultdict(set)
+
         for key, license_str in direct_matches.items():
             spdx_license = spdx(license_str)
             if spdx_license:
                 context.modify_node_attribute(key, "licenses", spdx_license)
-                print(f"Applied shadow license '{license_str}' to '{key}' (direct match)")
-        
+                license_usage[license_str].add(key)
+
         if wildcard_patterns:
-            self._apply_shadow_licenses(context, wildcard_patterns)
-        
+            wildcard_usage = self._apply_shadow_licenses(context, wildcard_patterns)
+            for lic, nodes in wildcard_usage.items():
+                license_usage[lic].update(nodes)
+
+        self._report_shadow_license_stats(license_usage)
         return context
 
     def remove_ref_lang(self, spdx_id: str) -> str:

@@ -25,13 +25,11 @@ from typing import Optional, Any
 import networkx as nx
 from rich.progress import Progress
 
+from liscopelens.checker import Checker
+from liscopelens.utils import GraphManager
+from liscopelens.utils.structure import DualLicense, Scope, Config, DualUnit
 
 from .base import BaseParser
-from liscopelens.checker import Checker
-
-from liscopelens.utils.structure import DualLicense, Scope, Config, DualUnit
-from liscopelens.utils import GraphManager, combined_generator, set2list, timer
-
 
 class BasePropagateParser(BaseParser):
 
@@ -314,7 +312,7 @@ class BasePropagateParser(BaseParser):
 
         with Progress() as progress:
             total_nodes = len(context.graph.nodes)
-            task = progress.add_task(f"[cyan]Parsing propogation...", total=total_nodes)
+            task = progress.add_task("[cyan]Parsing propogation...", total=total_nodes)
             for sub in nx.weakly_connected_components(context.graph):
                 for current_node, _, children in self.generate_processing_sequence(context.graph.subgraph(sub).copy()):
 

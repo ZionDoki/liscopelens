@@ -22,7 +22,9 @@ This module provides the command line interface of the project.
 
 import argparse
 
-# from .infer import *
+from rich.pretty import Pretty
+from rich.console import Console
+
 from .utils import load_config
 from .parser import PARSER_ENTRIES
 
@@ -31,6 +33,7 @@ def cli():
     """Command line interface of the project."""
     parser = argparse.ArgumentParser(description="部件兼容性分析工具")
     parser.add_argument("-c", "--config", type=str, default="", help="配置文件路径")
+    console = Console()
 
     subparsers = parser.add_subparsers(dest="command", required=True)
     for entry_name, parser_entry in PARSER_ENTRIES.items():
@@ -58,9 +61,13 @@ def cli():
 
     if args.config:
         config = load_config(args.config)
-        print("load config from", args.config)
+        console.print(f"[bold green]Loaded config from:[/bold green] {args.config}")
+
     else:
+        console.print("[bold yellow]Using default configuration[/bold yellow]")
         config = load_config()
+        
+    console.print(Pretty(config, expand_all=True))
 
     PARSER_ENTRIES[args.command](args, config).parse("", None)
 
