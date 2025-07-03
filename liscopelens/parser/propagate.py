@@ -351,6 +351,6 @@ class BasePropagateParser(BaseParser):
 
         if output := getattr(self.args, "output", None):
             os.makedirs(output, exist_ok=True)
-            context.save(output + "/propagated.gml")
+            context.save(output + "/propagated.json")
 
         return context

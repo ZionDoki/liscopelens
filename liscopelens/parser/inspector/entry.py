@@ -23,5 +23,5 @@ from liscopelens.parser.base import BaseParserEntry
 class QueryEntry(BaseParserEntry):
     parsers = (QueryParser,)
 
-    entry_name: str = "query"
-    entry_help: str = "This parser is used to query the results of the others parser"
+    entry_name: str = "inspect"
+    entry_help: str = "This parser is used to inspect the results of the others parser"

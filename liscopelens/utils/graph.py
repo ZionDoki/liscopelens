@@ -131,7 +131,23 @@ class GraphManager:
             if not os.path.exists(file_path):
                 warnings.warn(f"{file_path} not exists, create a new graph")
             else:
-                self.graph = nx.read_gml(file_path)
+                # 根据文件扩展名决定读取格式
+                if file_path.endswith('.json'):
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    self.graph = nx.readwrite.json_graph.node_link_graph(data, edges="edges")
+                elif file_path.endswith('.gml'):
+                    # 保持对旧 GML 文件的兼容性
+                    self.graph = nx.read_gml(file_path)
+                else:
+                    # 默认尝试 JSON 格式
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        self.graph = nx.readwrite.json_graph.node_link_graph(data, edges="edges")
+                    except (json.JSONDecodeError, KeyError):
+                        # 如果 JSON 解析失败，尝试 GML
+                        self.graph = nx.read_gml(file_path)
 
     def nodes(self, **kwargs):
         """wrapper for the nodes of the networkx."""
@@ -577,7 +593,7 @@ class GraphManager:
 
         return sibling_pairs
 
-    def save(self, file_path: str, stringizer=None, save_format="gml"):
+    def save(self, file_path: str, stringizer=None, save_format="json"):
         """save the graph to the file."""
         match(save_format):
             case "gml":

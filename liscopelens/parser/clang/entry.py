@@ -34,7 +34,7 @@ class CParserEntry(BaseParserEntry):
         EchoPaser,
     )
 
-    entry_name: str = "cParser"
+    entry_name: str = "clang"
     entry_help: str = (
         "This parser is used to parse the C/C++ repository and provide an include dependency graph for "
         "subsequent operations"

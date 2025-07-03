@@ -187,9 +187,22 @@ class QueryParser(BaseParser):
         if result_dir is None:
             raise ValueError("Result path is required for query parser")
 
-        gml_path = os.path.join(result_dir, "compatible_checked.gml")
-        print(f"Loading graph from {gml_path}...")
-        graph = nx.read_gml(gml_path)
+        json_path = os.path.join(result_dir, "compatible_checked.json")
+        print(f"Loading graph from {json_path}...")
+        
+        # 首先尝试加载 JSON 格式
+        if os.path.exists(json_path):
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            graph = nx.readwrite.json_graph.node_link_graph(data, edges="edges")
+        else:
+            # 如果 JSON 文件不存在，尝试加载旧的 GML 文件作为兼容性支持
+            gml_path = os.path.join(result_dir, "compatible_checked.gml")
+            if os.path.exists(gml_path):
+                print(f"JSON file not found, loading GML file from {gml_path}...")
+                graph = nx.read_gml(gml_path)
+            else:
+                raise FileNotFoundError(f"Neither {json_path} nor {gml_path} exists")
 
         app = GraphVisualizer(graph)
         app.run()

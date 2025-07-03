@@ -1,0 +1,86 @@
+{
+    "directed": true,
+    "multigraph": true,
+    "graph": {},
+    "nodes": [
+        {
+            "id": "root_node",
+            "parser_name": "TestParser",
+            "type": "executable"
+        },
+        {
+            "id": "node1",
+            "parser_name": "TestParser",
+            "type": "shared_library"
+        },
+        {
+            "id": "node2",
+            "parser_name": "TestParser",
+            "type": "shared_library"
+        },
+        {
+            "id": "node3",
+            "parser_name": "TestParser",
+            "type": "code"
+        },
+        {
+            "id": "node4",
+            "parser_name": "TestParser",
+            "type": "code"
+        },
+        {
+            "id": "node5",
+            "parser_name": "TestParser",
+            "type": "code"
+        },
+        {
+            "id": "node6",
+            "parser_name": "TestParser",
+            "type": "code"
+        }
+    ],
+    "edges": [
+        {
+            "source": "root_node",
+            "target": "node1",
+            "key": 0,
+            "parser_name": "TestParser",
+            "label": "deps"
+        },
+        {
+            "source": "root_node",
+            "target": "node2",
+            "key": 0,
+            "parser_name": "TestParser",
+            "label": "deps"
+        },
+        {
+            "source": "node1",
+            "target": "node3",
+            "key": 0,
+            "parser_name": "TestParser",
+            "label": "sources"
+        },
+        {
+            "source": "node1",
+            "target": "node4",
+            "key": 0,
+            "parser_name": "TestParser",
+            "label": "sources"
+        },
+        {
+            "source": "node2",
+            "target": "node5",
+            "key": 0,
+            "parser_name": "TestParser",
+            "label": "sources"
+        },
+        {
+            "source": "node2",
+            "target": "node6",
+            "key": 0,
+            "parser_name": "TestParser",
+            "label": "sources"
+        }
+    ]
+}

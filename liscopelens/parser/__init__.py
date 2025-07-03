@@ -18,5 +18,12 @@
 
 from .clang.entry import CParserEntry
 from .inspector.entry import QueryEntry
+from .hvigor.entry import HvigorParserEntry
+from .scancode import ScancodeParserEntry
 
-PARSER_ENTRIES = {"clang": CParserEntry, "inspect": QueryEntry}
+PARSER_ENTRIES = {
+    "clang": CParserEntry, 
+    "inspect": QueryEntry, 
+    "hvigor": HvigorParserEntry, 
+    "scancode": ScancodeParserEntry
+}

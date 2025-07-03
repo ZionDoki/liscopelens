@@ -321,7 +321,7 @@ class BaseCompatiblityParser(BaseParser):
 
         if output := getattr(self.args, "output", None):
             os.makedirs(output, exist_ok=True)
-            context.save(output + "/compatible_checked.gml")
+            context.save(output + "/compatible_checked.json")
             ret_results = {}
             for node, node_data in context.nodes(data=True):
                 conflict_group = node_data.get("conflict_group", None)

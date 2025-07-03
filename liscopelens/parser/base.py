@@ -113,3 +113,6 @@ class BaseParserEntry:
 
         for p in self._parsers:
             context = p.parse(project_path, context)
+
+
+        # Add arguments to arg_parser here if needed

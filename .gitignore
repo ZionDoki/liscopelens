@@ -15,6 +15,8 @@ __pycache__
 
 !test_template.gml
 !*/resources/*.json
+*/resources/*graph.json
+
 examples/ohProject
 .idea
 .xml
@@ -22,3 +24,6 @@ examples/ohProject
 exp*
 venv
 .vscode*
+
+output
+.roo
