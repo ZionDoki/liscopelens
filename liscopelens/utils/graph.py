@@ -28,6 +28,8 @@ from typing import Iterator, Optional, MutableMapping, Mapping, Any
 
 import networkx as nx
 
+from .structure import DualLicenseEncoder
+
 EdgeIndex = tuple[str, str, Optional[int]]
 
 
@@ -601,7 +603,7 @@ class GraphManager:
             case "json":
                 data = nx.readwrite.json_graph.node_link_data(self.graph, edges="edges")
                 with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(json.dumps(data, indent=4, ensure_ascii=False))
+                    f.write(json.dumps(data, indent=4, ensure_ascii=False, cls=DualLicenseEncoder))
             case _:
                 raise ValueError(f"Unsupported save_format: {save_format}. Supported formats are 'gml' and 'json'.")
 

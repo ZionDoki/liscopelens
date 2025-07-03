@@ -485,6 +485,9 @@ class ScancodeParser(BaseParser):
     def add_license(self, context: GraphManager, file_path: str, spdx_results: DualLicense, test):
         parent_label = "//" + file_path.replace("\\", "/")
 
+        if file_path == "ffmpeg_harmony_os/ffmpeg/src/main/cpp/thirdparty/fribidi/arm64-v8a/include/fribidi/fribidi-joining-types.h":
+            print (111111111111111111111111, parent_label)
+
         context_node = context.query_node_by_label(parent_label)
 
         if context_node and spdx_results:
@@ -619,7 +622,7 @@ class ScancodeParser(BaseParser):
                     if rel_path:
                         file_path = os.path.join(rel_path, match["from_file"])
                     else:
-                        file_path = os.path.relpath(match["from_file"], match["from_file"].split(os.sep)[0])
+                        file_path = match["from_file"]
 
                     spdx_results = self.spdx_parser(
                         match["license_expression_spdx"],
@@ -634,9 +637,10 @@ class ScancodeParser(BaseParser):
                 if rel_path:
                     file_path = os.path.join(rel_path, file["path"])
                 else:
-                    file_path = os.path.relpath(file["path"], file["path"].split(os.sep)[0])
-                if file["detected_license_expression_spdx"]:
+                    file_path = file["path"]
 
+                
+                if file["detected_license_expression_spdx"]:
                     spdx_results = self.spdx_parser(file["detected_license_expression_spdx"], file_path)
 
                     self.add_license(context, file_path, spdx_results, file["detected_license_expression_spdx"] + "_f")
@@ -698,6 +702,7 @@ class ScancodeParser(BaseParser):
 
         if output := getattr(self.args, "output", None):
             os.makedirs(output, exist_ok=True)
+            
             context.save(output + "/origin.json")
 
         return context

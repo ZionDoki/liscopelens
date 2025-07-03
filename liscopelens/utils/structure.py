@@ -589,7 +589,6 @@ class DualLicense(set[frozenset[DualUnit]]):
         """
         return {unit["spdx_id"] for group in self for unit in group}
 
-
     @classmethod
     def from_list(cls, licenses: list[list[DualUnit] | frozenset[DualUnit]]) -> "DualLicense":
         """
@@ -901,3 +900,18 @@ def load_config(path: Optional[str] = None) -> Config:
         path = str(get_resource_path(file_name="default.toml", resource_name="config"))
 
     return Config.from_toml(path)
+
+
+class DualLicenseEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, DualLicense):
+            return [[dict(unit) for unit in group] for group in o]
+        if isinstance(o, DualUnit):
+            return dict(o)
+        if isinstance(o, set):
+            return list(o)
+        if isinstance(o, frozenset):
+            return list(o)
+        if isinstance(o, Scope):
+            return dict(o)
+        return super().default(o)

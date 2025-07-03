@@ -1,0 +1,14 @@
+# _ if "DEFAULT" in permissive_spreads, then permissive license in any circumstances
+# _ have to be spread to upstream components
+
+
+blacklist = []
+license_isolations = []
+permissive_spreads = ["COMPILE", "STATIC_LINKING"]
+
+[literal_mapping]
+code = "COMPILE"
+shared_library = "DYNAMIC_LINKING"
+static_library = "STATIC_LINKING"
+executable = "EXECUTABLE"
+generated_file = "GENERATED"
