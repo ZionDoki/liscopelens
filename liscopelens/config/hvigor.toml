@@ -6,11 +6,31 @@ blacklist = []
 license_isolations = []
 permissive_spreads = ["COMPILE", "STATIC_LINKING"]
 
+# Edge-based propagation configuration
+edge_isolations = []
+edge_permissive_spreads = ["STATIC_LINKING"]
+default_edge_behavior = "inherit"
+
+[edge_literal_mapping]
+# Common edge types in Hvigor projects
+"dependency" = "DEPENDENCY"
+"include" = "INCLUDE"
+"link" = "STATIC_LINKING"
+"dynamic_link" = "DYNAMIC_LINKING"
+"compile_depend" = "COMPILE"
+"runtime_depend" = "RUNTIME"
+
 [literal_mapping]
-code = "COMPILE"
-compile = "COMPILE"
-shared_library = "DYNAMIC_LINKING"
-static_library = "STATIC_LINKING"
-executable = "EXECUTABLE"
-generated_file = "GENERATED"
+native_module = "DYNAMIC_LINKING"
+project = "COMPILE"
 module = "COMPILE"
+arkts_code = "COMPILE"
+native_code = "COMPILE"
+resource = "GENERATED"
+file = "COMPILE"
+external_package = "COMPILE"
+entry = "COMPILE"
+har = "STATIC_LINKING"
+shared = "DYNAMIC_LINKING"
+feature = "COMPILE"
+unknown = "COMPILE"

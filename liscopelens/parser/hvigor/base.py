@@ -1,56 +1,83 @@
 """
-Hvigor Adapter for Parsing Hvigor Projects"""
+Hvigor Parser for Parsing Hvigor Projects"""
 
 from pathlib import Path
-from typing import Union, Dict, Set
+from typing import Union, Dict, Set, Any, Optional
 
-from liscopelens.utils.graph import GraphManager, Vertex, Edge
+from liscopelens.utils.graph import GraphManager
+from liscopelens.parser.base import BaseParser
 
 from .entity import Project, Module, CodeFile, HvigorEntity
 from .constants import HvigorEdgeType, HvigorVertexType
 
 
-class HvigorAdapter:
+class HvigorParser(BaseParser):
     """
-    Adapter for parsing Hvigor projects and building dependency graphs.
+    Parser for parsing Hvigor projects and building dependency graphs.
 
-    This adapter follows a two-phase approach:
+    This parser follows a two-phase approach:
     1. Parse file structure and create 'contains' edges
     2. Parse configuration files and create 'deps' edges
     """
 
-    def __init__(self, root_path: Union[str, Path]):
-        self.root_path = Path(root_path)
-        self.graph = GraphManager()
-        self.entity_map: Dict[str, HvigorEntity] = {}  # name -> entity mapping
+    arg_table: Dict[str, Dict[str, Any]] = {
+        "--output": {
+            "help": "Output file path for the dependency graph",
+            "type": str,
+            "default": None,
+        }
+    }
 
-    def parse(self) -> GraphManager:
+    def __init__(self, args, config):
+        super().__init__(args, config)
+        self.graph: Optional[GraphManager] = None
+        self.project_root: Optional[Path] = None
+        self.entity_map: Dict[str, HvigorEntity] = {}
+
+    def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> GraphManager:
         """
-        Parse the Hvigor project at the given root path.
+        Parse the Hvigor project at the given project path.
+
+        Args:
+            project_path (Path): The path of the project to parse
+            context (Optional[GraphManager]): The context (GraphManager) of the project
 
         Returns:
             GraphManager: The graph representation of the Hvigor project or module.
 
         Raises:
-            ValueError: If the root path is not a valid Hvigor project or module.
+            ValueError: If the project path is not a valid Hvigor project or module.
         """
-        if Project.is_project(self.root_path):
-            tgt_project = Project.from_path(self.root_path)
+        if context is None:
+            context = GraphManager()
+
+        self.graph = context
+        self.project_root = project_path.resolve()  # Store project root for src_path calculation
+
+        if Project.is_project(project_path):
+            tgt_project = Project.from_path(project_path)
             self.handle_project(tgt_project)
-            return self.build_graph(tgt_project)
-        elif Module.is_module(self.root_path):
+            self.build_graph(tgt_project)
+        elif Module.is_module(project_path):
             # Check for multiple modules in the directory
-            modules = Module.find_modules_in_directory(self.root_path)
+            modules = Module.find_modules_in_directory(project_path)
             if modules:
                 for module in modules:
                     self.handle_module(module)
-                return self.build_graph(modules[0])  # Return graph for first module
+                self.build_graph(modules[0])  # Build graph for first module
             else:
-                tgt_module = Module.from_path(self.root_path)
+                tgt_module = Module.from_path(project_path)
                 self.handle_module(tgt_module)
-                return self.build_graph(tgt_module)
+                self.build_graph(tgt_module)
         else:
-            raise ValueError(f"Invalid Hvigor project or module path: {self.root_path}")
+            raise ValueError(f"Invalid Hvigor project or module path: {project_path}")
+
+        # Export graph if output path is specified
+        if hasattr(self.args, "output") and self.args.output:
+            output_format = getattr(self.args, "format", "json")
+            self.export_graph(self.args.output, output_format)
+
+        return self.graph
 
     def handle_project(self, project: Project) -> Project:
         """
@@ -83,7 +110,7 @@ class HvigorAdapter:
         self.entity_map[module.name] = module
         return module
 
-    def build_graph(self, root_entity: Union[Project, Module]) -> GraphManager:
+    def build_graph(self, root_entity: Union[Project, Module]):
         """
         Build the graph representation of the Hvigor project or module.
 
@@ -92,17 +119,12 @@ class HvigorAdapter:
 
         Args:
             root_entity (Union[Project, Module]): The root Hvigor project or module.
-
-        Returns:
-            GraphManager: The graph representation of the Hvigor project or module.
         """
         # Phase 1: Build contains relationships from file structure
         self._build_contains_graph(root_entity)
 
         # Phase 2: Build dependency relationships from configuration
         self._build_deps_graph(root_entity)
-
-        return self.graph
 
     def _build_contains_graph(self, entity: HvigorEntity):
         """
@@ -111,13 +133,23 @@ class HvigorAdapter:
         Args:
             entity (HvigorEntity): Entity to process
         """
-        # Add the entity as a vertex
+        # Add the entity as a vertex using base parser method
         vertex_type = self._get_vertex_type(entity)
-        vertex = Vertex(
-            label=entity.name,
+
+        # Calculate src_path relative to project root
+        src_path = self._calculate_src_path(entity.src_path)
+
+        # Use src_path as unique label to avoid ID conflicts for files with same name
+        unique_label = src_path if hasattr(entity, 'src_path') and entity.src_path.is_file() else entity.name
+
+        vertex = self.create_vertex(
+            label=unique_label,
             type=vertex_type,
-            path=str(entity.root_path),
+            path=str(entity.src_path),
+            src_path=src_path,
             is_native=getattr(entity, "is_native", False),
+            # Store original name for display purposes
+            file_name=entity.name,
         )
         self.graph.add_node(vertex)
 
@@ -125,8 +157,13 @@ class HvigorAdapter:
         for edge in entity.deps(HvigorEdgeType.CONTAINS):
             self._build_contains_graph(edge.dst)
 
-            # Create graph edge
-            graph_edge = Edge(u=entity.name, v=edge.dst.name, type=edge.edge_type.value)
+            # Calculate unique labels for edge endpoints
+            src_unique_label = src_path if hasattr(entity, 'src_path') and entity.src_path.is_file() else entity.name
+            dst_src_path = self._calculate_src_path(edge.dst.src_path)
+            dst_unique_label = dst_src_path if hasattr(edge.dst, 'src_path') and edge.dst.src_path.is_file() else edge.dst.name
+
+            # Create graph edge using unique labels
+            graph_edge = self.create_edge(u=src_unique_label, v=dst_unique_label, type=edge.edge_type.value)
             self.graph.add_edge(graph_edge)
 
     def _build_deps_graph(self, root_entity: Union[Project, Module]):
@@ -166,19 +203,35 @@ class HvigorAdapter:
                 # Local file dependency - try to find the target module
                 target_entity = self._find_local_dependency(dep)
                 if target_entity:
-                    # Add dependency edge
-                    dep_edge = Edge(
-                        u=module.name, v=target_entity.name, type=HvigorEdgeType.DEPENDS.value, dependency_type="local"
+                    # Calculate unique labels for dependency edge
+                    module_src_path = self._calculate_src_path(module.src_path)
+                    module_unique_label = module_src_path if hasattr(module, 'src_path') and module.src_path.is_file() else module.name
+                    target_src_path = self._calculate_src_path(target_entity.src_path)
+                    target_unique_label = target_src_path if hasattr(target_entity, 'src_path') and target_entity.src_path.is_file() else target_entity.name
+                    
+                    # Add dependency edge using base parser method
+                    dep_edge = self.create_edge(
+                        u=module_unique_label, v=target_unique_label, type=HvigorEdgeType.DEPENDS.value, dependency_type="local"
                     )
                     self.graph.add_edge(dep_edge)
             else:
                 # External ohpm dependency
-                # Create a virtual node for external dependency
-                ext_vertex = Vertex(label=dep.name, type=HvigorVertexType.EXTERNAL_PACKAGE.value, version=dep.version, is_external=True)
+                # Create a virtual node for external dependency using base parser method
+                ext_vertex = self.create_vertex(
+                    label=dep.name,
+                    type=HvigorVertexType.EXTERNAL_PACKAGE.value,
+                    version=dep.version,
+                    is_external=True,
+                    src_path=f"external/{dep.name}",  # Virtual src_path for external dependencies
+                )
                 self.graph.add_node(ext_vertex)
 
-                dep_edge = Edge(
-                    u=module.name, v=dep.name, type=HvigorEdgeType.DEPENDS.value, dependency_type="external"
+                # Calculate unique label for module
+                module_src_path = self._calculate_src_path(module.src_path)
+                module_unique_label = module_src_path if hasattr(module, 'src_path') and module.src_path.is_file() else module.name
+                
+                dep_edge = self.create_edge(
+                    u=module_unique_label, v=dep.name, type=HvigorEdgeType.DEPENDS.value, dependency_type="external"
                 )
                 self.graph.add_edge(dep_edge)
 
@@ -223,9 +276,18 @@ class HvigorAdapter:
         if isinstance(entity, Module):
             if entity.is_native:
                 return HvigorVertexType.NATIVE_MODULE.value
-            # Use the new convenience method
+            # Use the module type from ModuleProfile.ModuleConfig.type field
             module_type = entity.get_module_type()
-            return f"module_{module_type}"
+            if module_type == "entry":
+                return HvigorVertexType.MODULE_ENTRY.value
+            elif module_type == "feature":
+                return HvigorVertexType.MODULE_FEATURE.value
+            elif module_type == "har":
+                return HvigorVertexType.MODULE_HAR.value
+            elif module_type == "shared":
+                return HvigorVertexType.MODULE_SHARE.value
+            else:
+                return HvigorVertexType.MODULE.value
 
         if isinstance(entity, CodeFile):
             if entity.is_native_code:
@@ -269,4 +331,22 @@ class HvigorAdapter:
             output_path (Union[str, Path]): Output file path
             save_format (str): Export format ("json", "gml", "graphml")
         """
-        self.graph.save(str(output_path), save_format=save_format)
+        self.graph.save(str(Path(output_path) / "hvigor_graph.json"), save_format=save_format)
+
+    def _calculate_src_path(self, entity_path: Path) -> str:
+        """
+        Calculate the src_path attribute for an entity relative to project root.
+
+        Args:
+            entity_path (Path): The absolute path of the entity
+
+        Returns:
+            str: The relative path from project root in POSIX format
+        """
+        try:
+            entity_path_resolved = Path(entity_path).resolve()
+            relative_path = entity_path_resolved.relative_to(self.project_root)
+            return relative_path.as_posix()
+        except ValueError:
+            # If entity is not under project root, return the path as-is
+            return str(entity_path)

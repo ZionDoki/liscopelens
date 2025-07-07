@@ -109,6 +109,8 @@ class ScancodeParser(BaseParser):
         self.checker = Checker()
         self.spdx_parser = SPDXParser()
         self.count = set()
+        self.license_paths = {}  # Store LICENSE file paths and their licenses
+        self.detected_exceptions = {}  # Store detected exceptions for later processing
 
         # Normalize python version (remove patch version)
         if hasattr(args, "python_ver") and args.python_ver:
@@ -510,25 +512,39 @@ class ScancodeParser(BaseParser):
 
         This method adds the license information to the context node by matching
         against the configured node attribute (default: src_path)."""
-        
+
         # Use Path for proper path handling
         target_path = project_root.resolve()
         scan_file_path = Path(file_path).resolve()
-        
+
         # Calculate relative path from project root
         try:
             relative_path = scan_file_path.relative_to(target_path)
         except ValueError:
             # If file is not under project root, use original logic
             relative_path = Path(file_path)
-        
+
+        # Check if this is a LICENSE file
+        license_prefix = self._detect_license_files(str(relative_path), project_root)
+        if license_prefix:
+            print(f"Detected LICENSE file: {relative_path} -> prefix: {license_prefix}")
+            self.license_paths[license_prefix] = spdx_results
+
+        # Record detected exceptions for later processing
+        for group in spdx_results:
+            for unit in group:
+                if unit.get("exceptions"):
+                    for exception in unit["exceptions"]:
+                        self.detected_exceptions[exception] = True
+                        print(f"Detected exception: {exception}")
+
         # Get the attribute to match against (default: src_path)
         match_attr = getattr(self.args, "node_attr", "src_path")
-        
+
         # Find matching node by attribute
         matched_node = None
         target_path_str = str(relative_path.as_posix())
-        
+
         for _, node_data in context.nodes(data=True):
             node_path = node_data.get(match_attr)
             if node_path:
@@ -537,16 +553,21 @@ class ScancodeParser(BaseParser):
                 if node_path_obj.as_posix() == target_path_str or str(node_path_obj) == target_path_str:
                     matched_node = node_data
                     break
-        
+
         # Fallback to label-based matching for backward compatibility
         if not matched_node:
             parent_label = "//" + target_path_str
             matched_node = context.query_node_by_label(parent_label)
 
         if matched_node and spdx_results:
+            # Always add license information to the matched node
             matched_node["licenses"] = spdx_results
             matched_node["test"] = test
             self.count.add(target_path_str)
+            
+            # For LICENSE files, also mark them for prefix rule application
+            if license_prefix:
+                print(f"Added license to LICENSE file: {target_path_str}")
 
     def _report_shadow_license_stats(self, license_usage: dict[str, set[str]]):
         """
@@ -588,11 +609,11 @@ class ScancodeParser(BaseParser):
                 if not node_path:
                     # Fallback to node_id for backward compatibility
                     node_path = node_id
-                
+
                 # Convert to Path for proper matching
                 node_path_obj = Path(node_path)
                 node_path_str = node_path_obj.as_posix()
-                
+
                 for pattern, license_str in shadow_patterns.items():
                     # Use Path-aware pattern matching
                     if fnmatch.fnmatch(node_path_str, pattern) or fnmatch.fnmatch(str(node_path_obj), pattern):
@@ -652,6 +673,143 @@ class ScancodeParser(BaseParser):
         self._report_shadow_license_stats(license_usage)
         return context
 
+    def _detect_license_files(self, file_path: str, project_root: Path) -> Optional[str]:
+        """
+        Detect if a file is a LICENSE file and return its directory prefix.
+        
+        Args:
+            file_path: Path of the file being processed
+            project_root: Root directory of the project
+            
+        Returns:
+            Directory prefix if this is a LICENSE file, None otherwise
+        """
+        # Convert to Path for proper handling
+        file_path_obj = Path(file_path)
+        
+        # Check if filename matches LICENSE patterns
+        filename = file_path_obj.name.upper()
+        license_patterns = ['LICENSE', 'LICENCE', 'COPYING', 'COPYRIGHT']
+        
+        is_license_file = any(
+            filename == pattern or
+            filename.startswith(pattern + '.') or
+            filename.startswith(pattern + '-') or
+            filename.endswith('/' + pattern)
+            for pattern in license_patterns
+        )
+        
+        if is_license_file:
+            # Return the directory prefix
+            if file_path_obj.parent != Path('.') and file_path_obj.parent.name:
+                return str(file_path_obj.parent)
+            else:
+                return "."  # Root level LICENSE
+        
+        return None
+
+    def _load_exceptions_with_targets(self) -> dict[str, list[str]]:
+        """
+        Load exception licenses and their default targets.
+        
+        Returns:
+            Dictionary mapping exception SPDX ID to list of target SPDX IDs
+        """
+        from liscopelens.utils.structure import load_exceptions
+        
+        exceptions = load_exceptions()
+        exception_targets = {}
+        
+        for exception_id, exception_feat in exceptions.items():
+            if exception_feat.default_target:
+                exception_targets[exception_id] = exception_feat.default_target
+        
+        return exception_targets
+
+    def _apply_license_prefix_rules(self, context: GraphManager, project_root: Path):
+        """
+        Apply LICENSE file rules by adding licenses to nodes with matching prefixes.
+        
+        Args:
+            context: GraphManager instance to modify
+            project_root: Root directory of the project
+        """
+        if not self.license_paths:
+            return
+        
+        print(f"Applying LICENSE prefix rules for {len(self.license_paths)} LICENSE files...")
+        
+        match_attr = getattr(self.args, "node_attr", "src_path")
+        
+        for license_prefix, license_obj in self.license_paths.items():
+            print(f"Processing LICENSE prefix: {license_prefix}")
+            
+            # Find all nodes that match this prefix
+            for node_id, node_data in context.nodes(data=True):
+                if node_data.get("type") == "code":
+                    node_path = node_data.get(match_attr, node_id)
+                    node_path_obj = Path(node_path)
+                    
+                    # Check if node path starts with the license prefix
+                    try:
+                        node_path_str = str(node_path_obj.as_posix())
+                        if node_path_str.startswith(license_prefix) or str(node_path_obj).startswith(license_prefix):
+                            # Add LICENSE license using AND operation
+                            existing_licenses = node_data.get("licenses")
+                            if existing_licenses:
+                                # Combine with existing licenses using AND
+                                combined_licenses = existing_licenses & license_obj
+                                context.modify_node_attribute(node_id, "licenses", combined_licenses)
+                                print(f"  Combined LICENSE with existing licenses for: {node_path_str}")
+                            else:
+                                # No existing licenses, just add the LICENSE
+                                context.modify_node_attribute(node_id, "licenses", license_obj)
+                                print(f"  Added LICENSE to: {node_path_str}")
+                    except Exception as e:
+                        print(f"  Warning: Failed to process path {node_path}: {e}")
+
+    def _apply_exception_rules(self, context: GraphManager):
+        """
+        Apply exception rules to nodes with matching target licenses.
+        
+        Args:
+            context: GraphManager instance to modify
+        """
+        exception_targets = self._load_exceptions_with_targets()
+        if not exception_targets:
+            return
+        
+        print(f"Applying exception rules for {len(exception_targets)} exceptions...")
+        
+        # Track applied exceptions
+        exceptions_applied = defaultdict(int)
+        
+        for node_id, node_data in context.nodes(data=True):
+            if node_data.get("type") == "code" and node_data.get("licenses"):
+                node_licenses = node_data["licenses"]
+                
+                # Check for each exception type
+                for exception_id, target_spdx_ids in exception_targets.items():
+                    # Check if any detected exceptions match this exception type
+                    if exception_id in self.detected_exceptions:
+                        # Check if this node has any target licenses
+                        has_target_license = any(
+                            node_licenses.has_license(target_id) for target_id in target_spdx_ids
+                        )
+                        
+                        if has_target_license:
+                            # Apply exception to target licenses
+                            modified_licenses = node_licenses.apply_exception_to_targets(
+                                exception_id, target_spdx_ids
+                            )
+                            context.modify_node_attribute(node_id, "licenses", modified_licenses)
+                            exceptions_applied[exception_id] += 1
+                            print(f"  Applied {exception_id} to node: {node_id}")
+        
+        # Report applied exceptions
+        for exception_id, count in exceptions_applied.items():
+            print(f"Applied {exception_id} to {count} nodes")
+
     def remove_ref_lang(self, spdx_id: str) -> str:
         """Remove scancode ref prefix and language suffix from SPDX IDs.
 
@@ -690,7 +848,7 @@ class ScancodeParser(BaseParser):
         # Use Path for proper path handling
         json_path_obj = Path(json_path)
         project_path_obj = project_path.resolve()
-        
+
         # For scancode_dir mode, calculate relative path using Path
         scancode_dir = getattr(self.args, "scancode_dir", None)
         if scancode_dir:
@@ -716,31 +874,41 @@ class ScancodeParser(BaseParser):
                     )
 
                     if spdx_results:
-                        self.add_license(context, str(file_path), spdx_results,
-                                       match["license_expression_spdx"] + "_m", project_path_obj)
+                        self.add_license(
+                            context,
+                            str(file_path),
+                            spdx_results,
+                            match["license_expression_spdx"] + "_m",
+                            project_path_obj,
+                        )
 
             for file in scancode_results["files"]:
                 file_path = self._normalize_file_path(file["path"], rel_path, project_path_obj)
 
                 if file["detected_license_expression_spdx"]:
                     spdx_results = self.spdx_parser(file["detected_license_expression_spdx"], str(file_path))
-                    
-                    self.add_license(context, str(file_path), spdx_results,
-                                   file["detected_license_expression_spdx"] + "_f", project_path_obj)
+
+                    self.add_license(
+                        context,
+                        str(file_path),
+                        spdx_results,
+                        file["detected_license_expression_spdx"] + "_f",
+                        project_path_obj,
+                    )
 
     def _normalize_file_path(self, scancode_file_path: str, rel_path: Optional[Path], project_root: Path) -> Path:
         """Normalize file path from scancode output to project-relative path.
-        
+
         Args:
             scancode_file_path: File path from scancode output
             rel_path: Relative path for scancode_dir mode
             project_root: Project root directory
-            
+
         Returns:
             Normalized Path object relative to project root
         """
         scancode_path = Path(scancode_file_path)
-        
+
         if rel_path:
             # For scancode_dir mode: combine rel_path with file path
             file_path = rel_path / scancode_path
@@ -752,7 +920,7 @@ class ScancodeParser(BaseParser):
                 file_path = Path(*parts[1:])
             else:
                 file_path = scancode_path
-        
+
         return file_path
 
     def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> GraphManager:
@@ -805,6 +973,14 @@ class ScancodeParser(BaseParser):
             )
         else:
             raise ValueError("No scancode input provided. Use --scancode-file, --scancode-dir, or --scancode-scan.")
+
+        # Apply LICENSE prefix rules after all files have been processed
+        print("\n=== Applying LICENSE Node Strategy ===")
+        self._apply_license_prefix_rules(context, project_path)
+        
+        # Apply exception rules after LICENSE rules
+        print("\n=== Applying Exception Rules ===")
+        self._apply_exception_rules(context)
 
         if getattr(self.args, "shadow_license", None):
             print("Parsing shadow license...")

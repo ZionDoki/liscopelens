@@ -134,17 +134,17 @@ class GraphManager:
                 warnings.warn(f"{file_path} not exists, create a new graph")
             else:
                 # 根据文件扩展名决定读取格式
-                if file_path.endswith('.json'):
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                if file_path.endswith(".json"):
+                    with open(file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     self.graph = nx.readwrite.json_graph.node_link_graph(data, edges="edges")
-                elif file_path.endswith('.gml'):
+                elif file_path.endswith(".gml"):
                     # 保持对旧 GML 文件的兼容性
                     self.graph = nx.read_gml(file_path)
                 else:
                     # 默认尝试 JSON 格式
                     try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
+                        with open(file_path, "r", encoding="utf-8") as f:
                             data = json.load(f)
                         self.graph = nx.readwrite.json_graph.node_link_graph(data, edges="edges")
                     except (json.JSONDecodeError, KeyError):
@@ -335,10 +335,10 @@ class GraphManager:
     def edge_subgraph(self, edges: list[EdgeIndex]) -> "GraphManager":
         """
         edge subgraph of the graph.
-        
+
         Args:
             edges (list[EdgeIndex]): the edge index list that need to be subgraph.
-        
+
         Returns:
             GraphManager: the subgraph of the graph.
         """
@@ -590,18 +590,19 @@ class GraphManager:
         for children in parent_to_children.values():
             if len(children) > 1:
                 for idx, child in enumerate(children):
-                    for sibling in children[idx + 1:]:
+                    for sibling in children[idx + 1 :]:
                         sibling_pairs.append((child, sibling))
 
         return sibling_pairs
 
     def save(self, file_path: str, stringizer=None, save_format="json"):
         """save the graph to the file."""
-        match(save_format):
+        match (save_format):
             case "gml":
                 nx.write_gml(self.graph, file_path, stringizer=stringizer if stringizer else str)
             case "json":
                 data = nx.readwrite.json_graph.node_link_data(self.graph, edges="edges")
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(json.dumps(data, indent=4, ensure_ascii=False, cls=DualLicenseEncoder))
             case _:

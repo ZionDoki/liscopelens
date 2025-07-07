@@ -32,6 +32,7 @@ from liscopelens.utils.structure import DualLicense, Scope, Config, DualUnit
 
 from .base import BaseParser
 
+
 class BasePropagateParser(BaseParser):
 
     arg_table = {
@@ -287,7 +288,9 @@ class BasePropagateParser(BaseParser):
 
         return True
 
-    def apply_edge_propagation_rules(self, dual_lic: DualLicense, edge_data: dict, current_condition: Optional[str]) -> DualLicense:
+    def apply_edge_propagation_rules(
+        self, dual_lic: DualLicense, edge_data: dict, current_condition: Optional[str]
+    ) -> DualLicense:
         """
         Apply edge-specific propagation rules to licenses.
 
@@ -316,14 +319,14 @@ class BasePropagateParser(BaseParser):
                 for lic in group:
                     if not self.checker.is_license_exist(lic.unit_spdx):
                         continue
-                    
+
                     # Apply edge-specific propagation logic
                     if self.checker.is_copyleft(lic.unit_spdx):
                         new_group.add(DualUnit(lic["spdx_id"], current_condition, lic["exceptions"]))
                     else:
                         # Permissive license propagates through this edge type
                         new_group.add(DualUnit(lic["spdx_id"], current_condition, lic["exceptions"]))
-                
+
                 if new_group:
                     new.add(frozenset(new_group))
             return new
@@ -430,7 +433,7 @@ class BasePropagateParser(BaseParser):
 
                         # Get all edges between current_node and child to check edge types
                         edges_to_child = context.graph.get_edge_data(current_node, child)
-                        
+
                         # If no edge configuration is available, use legacy behavior
                         if not self.config.edge_literal_mapping and not self.config.edge_isolations:
                             # Legacy behavior: no edge type consideration
@@ -449,12 +452,12 @@ class BasePropagateParser(BaseParser):
                                     # Check if propagation should occur through this edge
                                     if not self.should_propagate_through_edge(edge_data, current_condition):
                                         continue
-                                    
+
                                     # Apply edge-specific propagation rules
                                     edge_modified_licenses = self.apply_edge_propagation_rules(
                                         dual_lic, edge_data, current_condition
                                     )
-                                    
+
                                     if child_propagated_licenses is None:
                                         child_propagated_licenses = edge_modified_licenses
                                     else:

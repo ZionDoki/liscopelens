@@ -425,6 +425,7 @@ class LicenseFeat:
         must: dict[str, ActionFeat], action that must be done
         special: dict[str, ActionFeat], special action
         human_review: bool, check if the license need human review
+        default_target: list[str], default target licenses for exception (only for exceptions)
     """
 
     spdx_id: str
@@ -434,6 +435,7 @@ class LicenseFeat:
     special: dict[str, ActionFeat] = field(default_factory=dict)
     scope: dict[str, dict] = field(default_factory=dict)
     human_review: bool = field(default=True)
+    default_target: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         if isinstance(self.can, dict):
@@ -733,6 +735,70 @@ class DualLicense(set[frozenset[DualUnit]]):
             bool: True if the license is in the DualLicense, otherwise False
         """
         return any(spdx_id in [unit.unit_spdx for unit in group] for group in self)
+
+    def apply_exception_to_targets(self, exception_spdx_id: str, target_spdx_ids: list[str]) -> "DualLicense":
+        """
+        Apply exception license to specific target licenses within this DualLicense.
+        
+        This method adds the exception to all DualUnit instances that match the target SPDX IDs.
+        
+        Args:
+            exception_spdx_id: SPDX ID of the exception license
+            target_spdx_ids: List of target license SPDX IDs that this exception should apply to
+            
+        Returns:
+            DualLicense: New DualLicense instance with exceptions applied
+            
+        Raises:
+            ValueError: If target_spdx_ids contains invalid SPDX IDs
+        """
+        from liscopelens.checker import Checker
+        
+        # Validate target SPDX IDs
+        checker = Checker()
+        for target_id in target_spdx_ids:
+            if not checker.is_license_exist(target_id):
+                raise ValueError(f"Invalid target SPDX ID: {target_id}")
+        
+        # For exceptions, we check if they exist in the exceptions list instead
+        try:
+            exceptions = load_exceptions()
+            if exception_spdx_id not in exceptions:
+                # Also check if it's a regular license
+                if not checker.is_license_exist(exception_spdx_id):
+                    raise ValueError(f"Invalid exception SPDX ID: {exception_spdx_id}")
+        except Exception:
+            # Fallback to basic license check if loading exceptions fails
+            if not checker.is_license_exist(exception_spdx_id):
+                raise ValueError(f"Invalid exception SPDX ID: {exception_spdx_id}")
+        
+        new_dual_license = DualLicense()
+        
+        for group in self:
+            new_group = set()
+            for unit in group:
+                # Check if this unit's SPDX ID matches any target
+                if unit["spdx_id"] in target_spdx_ids:
+                    # Create new unit with the exception added
+                    current_exceptions = unit.get("exceptions", [])
+                    if exception_spdx_id not in current_exceptions:
+                        new_exceptions = current_exceptions + [exception_spdx_id]
+                        new_unit = DualUnit(
+                            unit["spdx_id"],
+                            unit.get("condition"),
+                            new_exceptions
+                        )
+                        new_group.add(new_unit)
+                    else:
+                        # Exception already exists, keep original
+                        new_group.add(unit)
+                else:
+                    # No match, keep original unit
+                    new_group.add(unit)
+            
+            new_dual_license.add(frozenset(new_group))
+        
+        return new_dual_license
 
     @staticmethod
     def merge_group(set1: set[DualUnit], set2: set[DualUnit]) -> set[DualUnit]:

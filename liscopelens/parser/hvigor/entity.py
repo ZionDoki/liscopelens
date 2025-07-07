@@ -135,7 +135,7 @@ class HvigorEntity:
     Base class for Hvigor entities.
     """
 
-    root_path: Path
+    src_path: Path
     parent: Set["HvigorEntity"] = field(default_factory=set)
     name: str = field(init=False)
 
@@ -179,7 +179,7 @@ class HvigorEntity:
             yield fp
 
     @classmethod
-    def from_path(cls, root_path: Path) -> "HvigorEntity":
+    def from_path(cls, src_path: Path) -> "HvigorEntity":
         """
         Factory method to create an HvigorEntity from a given path.
         This method should be overridden by subclasses to provide specific behavior.
@@ -212,13 +212,13 @@ class CodeFile(HvigorEntity):
         """
         Set the name of the code file based on its path.
         """
-        self.name = self.root_path.name
-        self.is_arkts_code = self.root_path.suffix in TS_EXTS
-        self.is_native_code = self.root_path.suffix in NATIVE_EXTS
-        self.is_resource = "resource" in self.root_path.parts
+        self.name = self.src_path.name
+        self.is_arkts_code = self.src_path.suffix in TS_EXTS
+        self.is_native_code = self.src_path.suffix in NATIVE_EXTS
+        self.is_resource = "resource" in self.src_path.parts
 
     @classmethod
-    def from_path(cls, root_path: Path) -> "CodeFile":
+    def from_path(cls, src_path: Path) -> "CodeFile":
         """
         Factory method to create a CodeFile from a given path.
 
@@ -229,10 +229,10 @@ class CodeFile(HvigorEntity):
         Returns:
             CodeFile: An instance of CodeFile.
         """
-        if not root_path.is_file():
-            raise ValueError(f"Root path {root_path} is not a file.")
+        if not src_path.is_file():
+            raise ValueError(f"Root path {src_path} is not a file.")
 
-        cf = cls(root_path=root_path)
+        cf = cls(src_path=src_path)
         return cf
 
 
@@ -243,7 +243,7 @@ class Module(HvigorEntity):
 
     Attributes:
         name: Module name
-        root_path: Module root directory path
+        src_path: Module root directory path
     """
 
     targets: Dict[str, str] = field(default_factory=dict)
@@ -264,7 +264,7 @@ class Module(HvigorEntity):
     targets2path: Dict[str, Set[Path]] = field(default_factory=dict)
 
     def __post_init__(self):
-        self.name = self.root_path.name
+        self.name = self.src_path.name
         self.is_native = self._is_native()
         self._parse_dependencies()
 
@@ -294,7 +294,7 @@ class Module(HvigorEntity):
         """
         Check if the module is a native module based on its build profile.
         """
-        cpp_flag = (self.root_path / "src/main/cpp").exists()
+        cpp_flag = (self.src_path / "src/main/cpp").exists()
 
         # Use model if available, otherwise fall back to dict
         if self.build_profile_model:
@@ -307,7 +307,7 @@ class Module(HvigorEntity):
             profile_flag = self.build_profile.get("buildOption", {}).get("externalNativeOptions", {}) != {}
 
         if cpp_flag ^ (profile_flag or False):
-            warnings.warn(f"Detect native module but not confident on {self.root_path.as_posix()}.")
+            warnings.warn(f"Detect native module but not confident on {self.src_path.as_posix()}.")
 
         return cpp_flag or profile_flag
 
@@ -315,34 +315,34 @@ class Module(HvigorEntity):
         """Parse dependencies from oh-package.json5"""
         # Use model if available, otherwise fall back to dict
         if self.pkg_profile_model and self.pkg_profile_model.dependencies:
-            self.dependencies = Dependency.from_oh_package_deps(self.pkg_profile_model.dependencies, self.root_path)
+            self.dependencies = Dependency.from_oh_package_deps(self.pkg_profile_model.dependencies, self.src_path)
         else:
             # Legacy dict-based parsing
             deps = self.pkg_profile.get("dependencies", {})
-            self.dependencies = Dependency.from_oh_package_deps(deps, self.root_path)
+            self.dependencies = Dependency.from_oh_package_deps(deps, self.src_path)
 
     @classmethod
-    def from_path(cls, root_path: Path, module_path: Optional[Path] = None) -> "Module":
+    def from_path(cls, src_path: Path, module_path: Optional[Path] = None) -> "Module":
         """
         Factory method to create a Module from a given path.
 
         Args:
-            root_path (Path): The root path to the module directory.
+            src_path (Path): The root path to the module directory.
             module_path (Path, optional): Specific path to module.json5, if different from src/main/module.json5
 
         Returns:
             Module: An instance of Module.
         """
-        if not root_path.is_dir():
-            raise ValueError(f"Path {root_path} is not a directory.")
+        if not src_path.is_dir():
+            raise ValueError(f"Path {src_path} is not a directory.")
 
         # Determine module.json5 location
         if module_path is None:
-            module_path = root_path / "src/main/module.json5"
+            module_path = src_path / "src/main/module.json5"
 
         # Parse configuration files using Pydantic models
-        pkg_profile_path = root_path / HvigorProfile.PACKAGE_PROFILE.value
-        build_profile_path = root_path / HvigorProfile.BUILD_PROFILE.value
+        pkg_profile_path = src_path / HvigorProfile.PACKAGE_PROFILE.value
+        build_profile_path = src_path / HvigorProfile.BUILD_PROFILE.value
 
         pkg_profile_model = parse_hvigor_config(pkg_profile_path, "oh-package-module")
         build_profile_model = parse_hvigor_config(build_profile_path, "build-profile-module")
@@ -354,7 +354,7 @@ class Module(HvigorEntity):
         module_profile_dict = read_json5(module_path) if module_path.exists() else {}
 
         hm = cls(
-            root_path=root_path,
+            src_path=src_path,
             pkg_profile_model=pkg_profile_model,
             build_profile_model=build_profile_model,
             module_profile_model=module_profile_model,
@@ -370,34 +370,34 @@ class Module(HvigorEntity):
             hm.name = module_profile_dict["module"]["name"]
 
         # Add all files as contains edges
-        for fp in hm._safe_rglob_files(root_path):
+        for fp in hm._safe_rglob_files(src_path):
             cf = CodeFile.from_path(fp)
             hm.add_deps(cf, HvigorEdgeType.CONTAINS)
 
         return hm
 
     @classmethod
-    def is_module(cls, root_path: Path) -> bool:
+    def is_module(cls, src_path: Path) -> bool:
         """
         Check if the given path is a Hvigor module.
 
         Args:
-            root_path (Path): The path to check.
+            src_path (Path): The path to check.
 
         Returns:
             bool: True if the path is a Hvigor module, False otherwise.
         """
-        pkg_profile = root_path / HvigorProfile.PACKAGE_PROFILE.value
-        hvigor_config = root_path / HvigorProfile.HVIGOR_PROFILE.value
+        pkg_profile = src_path / HvigorProfile.PACKAGE_PROFILE.value
+        hvigor_config = src_path / HvigorProfile.HVIGOR_PROFILE.value
         return pkg_profile.is_file() and not hvigor_config.exists()
 
     @classmethod
-    def find_modules_in_directory(cls, root_path: Path) -> List["Module"]:
+    def find_modules_in_directory(cls, src_path: Path) -> List["Module"]:
         """
         Find all modules in a directory, supporting multiple modules per directory.
 
         Args:
-            root_path (Path): Directory to search for modules
+            src_path (Path): Directory to search for modules
 
         Returns:
             List[Module]: List of discovered modules
@@ -405,18 +405,18 @@ class Module(HvigorEntity):
         modules = []
 
         # Look for src/*/module.json5 pattern
-        src_dir = root_path / "src"
+        src_dir = src_path / "src"
         if src_dir.exists():
             for module_dir in src_dir.iterdir():
                 if module_dir.is_dir():
                     module_json = module_dir / "module.json5"
                     if module_json.exists():
-                        module = cls.from_path(root_path, module_json)
+                        module = cls.from_path(src_path, module_json)
                         modules.append(module)
 
         # If no modules found but has oh-package.json5, treat as single module
-        if not modules and cls.is_module(root_path):
-            modules.append(cls.from_path(root_path))
+        if not modules and cls.is_module(src_path):
+            modules.append(cls.from_path(src_path))
 
         return modules
 
@@ -475,7 +475,7 @@ class Project(HvigorEntity):
     Represents a complete Hvigor project.
 
     Attributes:
-        root_path (Path): The root path of the Hvigor project.
+        src_path (Path): The root path of the Hvigor project.
         products (Dict[str, Product]): A dictionary mapping product names to Product objects.
         build_profile (Optional[Dict]): The build profile of the project, if available.
         app_profile (Optional[Dict]): The application profile of the project, if available.
@@ -503,7 +503,7 @@ class Project(HvigorEntity):
         """
         Set the name of the project based on its root path.
         """
-        self.name = self.root_path.name
+        self.name = self.src_path.name
 
         # Parse products and targets from build profile using model if available
         if self.build_profile_model and self.build_profile_model.app.products:
@@ -538,39 +538,39 @@ class Project(HvigorEntity):
                 self.module_configs[module_name] = module_config
 
     @classmethod
-    def is_project(cls, root_path: Path) -> bool:
+    def is_project(cls, src_path: Path) -> bool:
         """
         Check if the given path is a Hvigor project.
 
         Args:
-            root_path (Path): The path to check.
+            src_path (Path): The path to check.
 
         Returns:
             bool: True if the path is a Hvigor project, False otherwise.
         """
-        hvigor_config = root_path / HvigorProfile.HVIGOR_PROFILE.value
+        hvigor_config = src_path / HvigorProfile.HVIGOR_PROFILE.value
         return hvigor_config.is_file()
 
     @classmethod
-    def from_path(cls, root_path: Path) -> "Project":
+    def from_path(cls, src_path: Path) -> "Project":
         """
-        Factory method to create a Project from a given root_path path.
+        Factory method to create a Project from a given src_path path.
 
         Args:
-            root_path (Path): The root_path path of the Hvigor project.
+            src_path (Path): The src_path path of the Hvigor project.
             parents (Set[HvigorEntity]): The parent entities of this project.
 
         Returns:
             Project: An instance of Project.
         """
-        if not root_path.is_dir():
-            raise ValueError(f"root_path path {root_path} is not a directory.")
+        if not src_path.is_dir():
+            raise ValueError(f"src_path path {src_path} is not a directory.")
 
         # Parse configuration files using Pydantic models
-        hvigor_profile_path = root_path / HvigorProfile.HVIGOR_PROFILE.value
-        build_profile_path = root_path / HvigorProfile.BUILD_PROFILE.value
-        app_profile_path = root_path / HvigorProfile.APP_PROFILE.value
-        pkg_profile_path = root_path / HvigorProfile.PACKAGE_PROFILE.value
+        hvigor_profile_path = src_path / HvigorProfile.HVIGOR_PROFILE.value
+        build_profile_path = src_path / HvigorProfile.BUILD_PROFILE.value
+        app_profile_path = src_path / HvigorProfile.APP_PROFILE.value
+        pkg_profile_path = src_path / HvigorProfile.PACKAGE_PROFILE.value
 
         hvigor_profile_model = parse_hvigor_config(hvigor_profile_path, "hvigor-config")
         build_profile_model = parse_hvigor_config(build_profile_path, "build-profile-project")
@@ -584,7 +584,7 @@ class Project(HvigorEntity):
         pkg_profile_dict = read_json5(pkg_profile_path)
 
         tgt_project = cls(
-            root_path=root_path,
+            src_path=src_path,
             hvigor_profile_model=hvigor_profile_model,
             build_profile_model=build_profile_model,
             app_profile_model=app_profile_model,
@@ -598,6 +598,12 @@ class Project(HvigorEntity):
         # Discover modules
         tgt_project._discover_modules()
 
+        # Add root directory files (LICENSE, README, etc.)
+        for file_path in tgt_project.src_path.iterdir():
+            if file_path.is_file():  # Only process files, not directories
+                cf = CodeFile.from_path(file_path)
+                tgt_project.add_deps(cf, HvigorEdgeType.CONTAINS)
+
         return tgt_project
 
     def _discover_modules(self):
@@ -606,7 +612,7 @@ class Project(HvigorEntity):
         if self.build_profile_model and self.build_profile_model.modules:
             for module_config in self.build_profile_model.modules:
                 src_path = module_config.srcPath
-                module_dir = self.root_path / src_path.lstrip("./")
+                module_dir = self.src_path / src_path.lstrip("./")
 
                 if module_dir.exists():
                     modules = Module.find_modules_in_directory(module_dir)
@@ -618,7 +624,7 @@ class Project(HvigorEntity):
             modules_config = self.build_profile.get("modules", [])
             for module_config in modules_config:
                 src_path = module_config.get("srcPath", f"./{module_config['name']}")
-                module_dir = self.root_path / src_path.lstrip("./")
+                module_dir = self.src_path / src_path.lstrip("./")
 
                 if module_dir.exists():
                     modules = Module.find_modules_in_directory(module_dir)
@@ -627,7 +633,7 @@ class Project(HvigorEntity):
                         self.add_deps(module, HvigorEdgeType.CONTAINS)
         else:
             # If no build profile, scan all subdirectories
-            for dp in self.root_path.iterdir():
+            for dp in self.src_path.iterdir():
                 if dp.is_dir() and dp.name not in ["hvigor", "AppScope"]:
                     modules = Module.find_modules_in_directory(dp)
                     for module in modules:

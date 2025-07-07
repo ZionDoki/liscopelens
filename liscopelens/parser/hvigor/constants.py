@@ -52,10 +52,10 @@ class HvigorVertexType(Enum):
     FILE = "file"
     UNKNOWN = "unknown"
     EXTERNAL_PACKAGE = "external_package"
-    MODULE_ENTRY = "module_entry"
-    MODULE_HAR = "module_har"
-    MODULE_SHARE = "module_share"
-    MODULE_FEATURE = "module_feature"
+    MODULE_ENTRY = "entry"
+    MODULE_HAR = "har"
+    MODULE_SHARE = "shared"
+    MODULE_FEATURE = "feature"
 
 
 class HvigorEdgeType(Enum):

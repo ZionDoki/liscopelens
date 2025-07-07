@@ -234,9 +234,7 @@ class BaseCompatiblityParser(BaseParser):
             total_nodes = len(context.graph.nodes)
             task = progress.add_task("[red]Parsing compatibility...", total=total_nodes)
             for sub in nx.weakly_connected_components(context.graph):
-                for current_node, parents, _ in self.generate_processing_sequence(
-                    context.graph.subgraph(sub).copy()
-                ):
+                for current_node, parents, _ in self.generate_processing_sequence(context.graph.subgraph(sub).copy()):
 
                     dual_before_check = context.nodes()[current_node].get("before_check", None)
 
@@ -277,7 +275,9 @@ class BaseCompatiblityParser(BaseParser):
                                 continue
 
                             # new_pattern = set(filter(lambda conflict: conflict not in conflict_pattern, conflicts))
-                            new_pattern = set([conflict for conflict in new_pattern if conflict not in conflict_pattern])
+                            new_pattern = set(
+                                [conflict for conflict in new_pattern if conflict not in conflict_pattern]
+                            )
 
                             if len(new_pattern) != len(conflicts):
                                 context.nodes()[current_node]["conflict_group"] = (
@@ -343,7 +343,25 @@ class BaseCompatiblityParser(BaseParser):
                         if lic not in [lic.unit_spdx for lic in itertools.chain(*outbound)]:
                             continue
 
-                        ret_results[conflict_id][lic] = ret_results[conflict_id].get(lic, set()).union({node})
+                        node_identifier = node
+
+                        if node_data.get("path"):
+                            node_identifier = node_data["path"]
+                        elif hasattr(self.args, "node_attr") and self.args.node_attr:
+                            if hasattr(self.args, self.args.node_attr):
+                                attr_value = getattr(self.args, self.args.node_attr)
+                                if attr_value:
+                                    node_identifier = attr_value
+                            elif self.args.node_attr in node_data:
+                                attr_value = node_data[self.args.node_attr]
+                                if attr_value:
+                                    node_identifier = attr_value
+                        elif "src_path" in node_data and node_data["src_path"]:
+                            node_identifier = node_data["src_path"]
+
+                        ret_results[conflict_id][lic] = (
+                            ret_results[conflict_id].get(lic, set()).union({node_identifier})
+                        )
 
             with open(output + "/results.json", "w", encoding="utf8") as f:
                 f.write(json.dumps(ret_results, default=lambda x: set2list(x) if isinstance(x, set) else x, indent=4))

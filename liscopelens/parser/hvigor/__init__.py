@@ -21,5 +21,6 @@ Hvigor project dependency graph parser.
 """
 
 from .entry import HvigorParserEntry
+from .base import HvigorParser
 
-__all__ = ["HvigorParserEntry"]
+__all__ = ["HvigorParserEntry", "HvigorParser"]

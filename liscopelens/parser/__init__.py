@@ -18,12 +18,13 @@
 
 from .clang.entry import CParserEntry
 from .inspector.entry import QueryEntry
-from .hvigor.entry import HvigorParserEntry
+from .hvigor.entry import HvigorParserEntry, BatchHvigorParserEntry
 from .scancode import ScancodeParserEntry
 
 PARSER_ENTRIES = {
-    "clang": CParserEntry, 
-    "inspect": QueryEntry, 
-    "hvigor": HvigorParserEntry, 
+    "clang": CParserEntry,
+    "inspect": QueryEntry,
+    "hvigor": HvigorParserEntry,
+    "hvigor-batch": BatchHvigorParserEntry,
     "scancode": ScancodeParserEntry
 }
