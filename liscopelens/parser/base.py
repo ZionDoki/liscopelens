@@ -21,6 +21,7 @@ The base classes of Parsers.
 """
 import argparse
 import warnings
+from pathlib import Path
 from typing import Any, Dict, Tuple, Optional, Type
 
 from abc import ABC, abstractmethod
@@ -31,13 +32,21 @@ from liscopelens.utils.structure import Config
 class BaseParser(ABC):
     """
     Properties:
-        - arg_table: A dictionary that contains the arguments for the parser. The key is the argument name,
-            and the value is a dictionary that contains the following keys:
-                - type: the type of the argument
-                - help: the help message of the argument
-                - group: the group name of the argument (add to a mutually exclusive group if not None)
+        - arg_table: A dictionary that contains the arguments for the parser. The key is the argument name.
         - args: The parsed arguments. When Entry is initialized, the args will be passed to the parser.
-        - config: The configuration of the parser. The configuration will be passed to the parser when Entry is initialized.
+        - config: The configuration of the parser. The configuration will be passed to the parser.
+
+    Methods:
+        - normalize_path: Normalize the given path to ensure it is absolute and properly formatted.
+        - path2gnlike: Convert a normalized path to a GNLike format path.
+        - gnlike2path: Convert a GNLike format path back to a normalized path.
+        - create_vertex: Create a vertex with the given label and additional properties.
+        - create_edge: Create an edge between two vertices with additional properties.
+
+    Abstract Methods:
+        - parse: Parse the arguments and update the context (GraphManager) of the project.
+        This method should be implemented by subclasses to define how the parser processes the input arguments
+        and updates the graph context.
     """
 
     arg_table: Dict[str, Dict[str, Any]]
@@ -45,6 +54,36 @@ class BaseParser(ABC):
     def __init__(self, args: argparse.Namespace, config: Config):
         self.args = args
         self.config = config
+
+    def path2gnlike(self, target_path: Path, root_path: Path) -> str:
+        """
+        Convert a normalized path to a GNLike format path.
+
+        Args:
+            target_path (Path): The normalized path to be converted.
+            root_path (Path): The root path to be used as the base for conversion.
+
+        Returns:
+            str: The GNLike format path.
+        """
+        return "//" + target_path.resolve().relative_to(root_path.resolve()).as_posix()
+
+    def gnlike2path(self, gnlike_path: str, root_path: Path) -> Path:
+        """
+        Convert a GNLike format path back to a normalized path.
+
+        Args:
+            gnlike_path (str): The GNLike format path to be converted.
+            root_path (Path): The root path to be used as the base for conversion.
+
+        Returns:
+            Path: The normalized path.
+        """
+        if not gnlike_path.startswith("//"):
+            raise ValueError(f"Invalid GNLike path: {gnlike_path}")
+
+        relative_path = Path(gnlike_path[2:])
+        return root_path / relative_path
 
     def create_vertex(self, label: str, **kwargs: Any) -> Vertex:
         """Create a vertex"""
@@ -85,6 +124,8 @@ class BaseParserEntry:
         """
         when user input the command liscopelens [entry_name] hit the enter key, the parser will be initialized.
         """
+        self.args = args
+        self.config = config
         if self.parsers is None:
             raise NotImplementedError("No parsers found")
 

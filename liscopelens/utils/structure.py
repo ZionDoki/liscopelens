@@ -60,9 +60,15 @@ class Config:
         license_isolations: list[str], list of licenses that will be isolated
         literal_mapping: dict[str, str], mapping of the usage literals to ScopeElment enum
         permissiver_spreads: list[str], list of conditions that will make a permissive license spread
+        edge_literal_mapping: dict[str, str], mapping of edge type literals to enum
+        edge_isolations: list[str], list of edge conditions that will block license propagation
+        edge_permissive_spreads: list[str], list of edge conditions that will make permissive license spread
+        default_edge_behavior: str, default behavior for unmapped edge types ("allow", "block", "inherit")
     Methods:
         literal2enum(literal: str) -> str: convert usage literal to ScopeElement enum
         enum2literal(enum: str) -> set[str]: convert ScopeElement enum to usage literals
+        edge_literal2enum(literal: str) -> str: convert edge type literal to enum
+        enum2edge_literal(enum: str) -> set[str]: convert enum to edge type literals
         from_toml(path: str) -> Config: load Config from a toml file
     """
 
@@ -70,6 +76,10 @@ class Config:
     license_isolations: list[str] = field(default_factory=list)
     permissive_spreads: list[str] = field(default_factory=list)
     literal_mapping: dict[str, str] = field(default_factory=dict)
+    edge_literal_mapping: dict[str, str] = field(default_factory=dict)
+    edge_isolations: list[str] = field(default_factory=list)
+    edge_permissive_spreads: list[str] = field(default_factory=list)
+    default_edge_behavior: str = field(default="inherit")
 
     def literal2enum(self, literal: str) -> Optional[str]:
         """
@@ -108,6 +118,44 @@ class Config:
             set[str]: set of usage literals
         """
         return {k for k, v in self.literal_mapping.items() if enum in v}
+
+    def edge_literal2enum(self, literal: str) -> Optional[str]:
+        """
+        Convert edge type literal to enum.
+
+        Usage:
+        ```
+        config = Config(edge_literal_mapping={"depends_on": "DEPENDENCY"})
+        print(config.edge_literal2enum("depends_on"))
+        # Output: "DEPENDENCY"
+        ```
+
+        Args:
+            literal: str, edge type literal
+
+        Returns:
+            str: edge type enum
+        """
+        return self.edge_literal_mapping.get(literal, None)
+
+    def enum2edge_literal(self, enum: str) -> set[str]:
+        """
+        Convert enum to edge type literals.
+
+        Usage:
+        ```
+        config = Config(edge_literal_mapping={"depends_on": "DEPENDENCY", "uses": "DEPENDENCY"})
+        print(config.enum2edge_literal("DEPENDENCY"))
+        # Output: {"depends_on", "uses"}
+        ```
+
+        Args:
+            enum: str, edge type enum
+
+        Returns:
+            set[str]: set of edge type literals
+        """
+        return {k for k, v in self.edge_literal_mapping.items() if enum in v}
 
     @classmethod
     def from_toml(cls, path: str) -> "Config":

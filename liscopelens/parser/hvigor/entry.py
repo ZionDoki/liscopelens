@@ -20,15 +20,18 @@
 Hvigor parser entry point.
 """
 
+# import os
+# import copy
+# import argparse
+
+# from liscopelens.utils.structure import Config
 from liscopelens.parser.base import BaseParserEntry
-from liscopelens.parser.scancode import ScancodeParser
-from liscopelens.parser.exception import BaseExceptionParser
-from liscopelens.parser.compatible import BaseCompatiblityParser
-from liscopelens.parser.propagate import BasePropagateParser
-from liscopelens.parser.inspector.echo import EchoPaser
-from .project_parser import HvigorProjectParser
-from .arkts_mapping import HvigorArkTSMappingParser
-from .native_mapping import HvigorNativeMappingParser
+
+# from liscopelens.parser.scancode import ScancodeParser
+# from liscopelens.parser.exception import BaseExceptionParser
+# from liscopelens.parser.compatible import BaseCompatiblityParser
+# from liscopelens.parser.propagate import BasePropagateParser
+# from liscopelens.parser.inspector.echo import EchoPaser
 
 
 class HvigorParserEntry(BaseParserEntry):
@@ -38,14 +41,14 @@ class HvigorParserEntry(BaseParserEntry):
     """
 
     parsers = (
-        HvigorProjectParser,
-        HvigorArkTSMappingParser,
-        HvigorNativeMappingParser,
-        ScancodeParser,
-        BaseExceptionParser,
-        BasePropagateParser,
-        BaseCompatiblityParser,
-        EchoPaser,
+        # HvigorModuleParser,
+        # HvigorArkTSMappingParser,
+        # HvigorNativeMappingParser,
+        # ScancodeParser,
+        # BaseExceptionParser,
+        # BasePropagateParser,
+        # BaseCompatiblityParser,
+        # EchoPaser,
     )
     entry_help = "Parse Hvigor project dependency graph and perform license compatibility analysis."
     entry_name = "hvigor"

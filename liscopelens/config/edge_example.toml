@@ -1,0 +1,34 @@
+# 原有的节点配置
+blacklist = ["GPL-3.0-only"]
+license_isolations = ["EXECUTABLE"]
+permissive_spreads = ["COMPILE", "STATIC_LINKING"]
+
+# 节点类型的字面量映射
+[literal_mapping]
+code = "COMPILE"
+shared_library = "DYNAMIC_LINKING"
+static_library = "STATIC_LINKING"
+executable = "EXECUTABLE"
+generated_file = "GENERATED"
+
+# 新增的边类型配置
+# 边类型的字面量映射
+[edge_literal_mapping]
+depends_on = "DEPENDENCY"
+includes = "INCLUDE"
+links_to = "LINKING"
+uses = "USAGE"
+compiles_with = "COMPILE_DEPENDENCY"
+runtime_depends = "RUNTIME_DEPENDENCY"
+
+# 阻止许可证传播的边类型
+edge_isolations = ["RUNTIME_DEPENDENCY"]
+
+# 允许宽松许可证传播的边类型
+edge_permissive_spreads = ["INCLUDE", "LINKING"]
+
+# 默认边行为: "allow", "block", "inherit"
+# - "allow": 未匹配的边类型默认允许传播
+# - "block": 未匹配的边类型默认阻止传播
+# - "inherit": 未匹配的边类型继承原有行为（默认）
+default_edge_behavior = "inherit"

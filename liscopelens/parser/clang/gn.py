@@ -1,4 +1,4 @@
-    #!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 #
@@ -63,6 +63,122 @@ class GnParser(BaseParser):
         },
     }
 
+    def _ensure_vertex(self, ctx: GraphManager, name: str, vtype: str) -> None:
+        key = (name, vtype)
+        if key in self._visited_nodes:
+            return
+        ctx.add_node(self.create_vertex(name, type=vtype))
+        self._visited_nodes.add(key)
+
+    def _ensure_edge(self, ctx: GraphManager, src: str, dst: str, *, label: str) -> None:
+        key = (src, dst, label)
+        if key in self._visited_edges:
+            return
+        ctx.add_edge(self.create_edge(src, dst, label=label))
+        self._visited_edges.add(key)
+
+    def _get_graph_stats(self, ctx: GraphManager, targets: dict[str, dict]) -> dict:
+        """Get graph statistics"""
+        total_nodes = len(ctx.nodes())
+        total_edges = len(list(ctx.edges()))
+
+        group_nodes = 0
+        non_group_nodes = 0
+        for node in ctx.nodes():
+            if targets.get(node, {}).get("type") == "group":
+                group_nodes += 1
+            else:
+                non_group_nodes += 1
+
+        deps_edges = 0
+        sources_edges = 0
+        via_group_edges = 0
+        for _, _, data in ctx.edges(data=True):
+            if data.get("label") == "deps":
+                if data.get("via_group"):
+                    via_group_edges += 1
+                else:
+                    deps_edges += 1
+            elif data.get("label") == "sources":
+                sources_edges += 1
+
+        return {
+            "Total Nodes": total_nodes,
+            "Total Edges": total_edges,
+            "Group Nodes": group_nodes,
+            "Non-Group Nodes": non_group_nodes,
+            "Deps Edges": deps_edges,
+            "Sources Edges": sources_edges,
+            "Via Group Edges": via_group_edges,
+        }
+
+    def _print_graph_comparison(self, before_stats: dict, after_stats: dict) -> None:
+        """Print graph changes before and after merging using rich table"""
+        console = Console()
+        table = Table(title="Graph Changes Before and After Group Removal")
+
+        table.add_column("Statistic", style="cyan")
+        table.add_column("Before Merge", style="green")
+        table.add_column("After Merge", style="red")
+        table.add_column("Change", style="yellow")
+
+        for key in before_stats.keys():
+            before_val = before_stats[key]
+            after_val = after_stats[key]
+            change = after_val - before_val
+            change_str = f"{change:+d}" if change != 0 else "0"
+
+            table.add_row(str(key), str(before_val), str(after_val), change_str)
+
+        console.print(table)
+
+    def _merge_groups(self, ctx: GraphManager, targets: dict[str, dict]) -> None:
+        """Add synthetic edges so that predecessors of group targets point directly to non-group leaves."""
+        # Get statistics before merging
+        before_stats = self._get_graph_stats(ctx, targets)
+        in_map: dict[str, list[str]] = defaultdict(list)  # dst (group) → [src…]
+        out_map: dict[str, list[str]] = defaultdict(list)  # src (group) → [dst…]
+
+        for src, dst, data in ctx.edges(data=True):
+            label = data.get("label")
+            if label != "deps":
+                continue
+            if targets.get(dst, {}).get("type") == "group":
+                in_map[dst].append(src)
+            if targets.get(src, {}).get("type") == "group":
+                out_map[src].append(dst)
+
+        @functools.lru_cache(maxsize=None)
+        def _terminals(g: str) -> list[str]:
+            leaves: list[str] = []
+            for nxt in out_map.get(g, []):
+                if targets.get(nxt, {}).get("type") == "group":
+                    leaves.extend(_terminals(nxt))
+                else:
+                    leaves.append(nxt)
+            return leaves
+
+        for grp, preds in in_map.items():
+            leaves = _terminals(grp)
+            for p in preds:
+                for leaf in leaves:
+                    # avoid duplicate synthetic edge
+                    key = (p, leaf, "deps")
+                    if key in self._visited_edges:
+                        continue
+                    e = self.create_edge(p, leaf, label="deps")
+                    e["via_group"] = grp  # keep traceability
+                    ctx.add_edge(e)
+                    self._visited_edges.add(key)
+
+        nodes_to_remove = [n for n in ctx.nodes() if targets.get(n, {}).get("type") == "group"]
+        for node in nodes_to_remove:
+            ctx.graph.remove_node(node)
+
+        # Get statistics after merging and print comparison
+        after_stats = self._get_graph_stats(ctx, targets)
+        self._print_graph_comparison(before_stats, after_stats)
+
     def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
         """Entry point called by the pipeline."""
         if context is None:
@@ -99,126 +215,3 @@ class GnParser(BaseParser):
         # Phase 2: merge/collapse group chains into direct deps
         self._merge_groups(context, targets)
         return context
-
-    def _ensure_vertex(self, ctx: GraphManager, name: str, vtype: str) -> None:
-        key = (name, vtype)
-        if key in self._visited_nodes:
-            return
-        ctx.add_node(self.create_vertex(name, type=vtype))
-        self._visited_nodes.add(key)
-
-    def _ensure_edge(self, ctx: GraphManager, src: str, dst: str, *, label: str) -> None:
-        key = (src, dst, label)
-        if key in self._visited_edges:
-            return
-        ctx.add_edge(self.create_edge(src, dst, label=label))
-        self._visited_edges.add(key)
-
-    def _get_graph_stats(self, ctx: GraphManager, targets: dict[str, dict]) -> dict:
-        """Get graph statistics"""
-        total_nodes = len(ctx.nodes())
-        total_edges = len(list(ctx.edges()))
-        
-        group_nodes = 0
-        non_group_nodes = 0
-        for node in ctx.nodes():
-            if targets.get(node, {}).get("type") == "group":
-                group_nodes += 1
-            else:
-                non_group_nodes += 1
-        
-        deps_edges = 0
-        sources_edges = 0
-        via_group_edges = 0
-        for _, _, data in ctx.edges(data=True):
-            if data.get("label") == "deps":
-                if data.get("via_group"):
-                    via_group_edges += 1
-                else:
-                    deps_edges += 1
-            elif data.get("label") == "sources":
-                sources_edges += 1
-        
-        return {
-            "Total Nodes": total_nodes,
-            "Total Edges": total_edges,
-            "Group Nodes": group_nodes,
-            "Non-Group Nodes": non_group_nodes,
-            "Deps Edges": deps_edges,
-            "Sources Edges": sources_edges,
-            "Via Group Edges": via_group_edges,
-        }
-
-    def _print_graph_comparison(self, before_stats: dict, after_stats: dict) -> None:
-        """Print graph changes before and after merging using rich table"""
-        console = Console()
-        table = Table(title="Graph Changes Before and After Group Removal")
-        
-        table.add_column("Statistic", style="cyan")
-        table.add_column("Before Merge", style="green")
-        table.add_column("After Merge", style="red")
-        table.add_column("Change", style="yellow")
-        
-        for key in before_stats.keys():
-            before_val = before_stats[key]
-            after_val = after_stats[key]
-            change = after_val - before_val
-            change_str = f"{change:+d}" if change != 0 else "0"
-            
-            table.add_row(
-                str(key),
-                str(before_val),
-                str(after_val),
-                change_str
-            )
-        
-        console.print(table)
-
-    def _merge_groups(self, ctx: GraphManager, targets: dict[str, dict]) -> None:
-        """Add synthetic edges so that predecessors of group targets point directly to non-group leaves."""
-        # Get statistics before merging
-        before_stats = self._get_graph_stats(ctx, targets)
-        in_map: dict[str, list[str]] = defaultdict(list)   # dst (group) → [src…]
-        out_map: dict[str, list[str]] = defaultdict(list)  # src (group) → [dst…]
-
-        for src, dst, data in ctx.edges(data=True):
-            label = data.get("label")
-            if label != "deps":
-                continue
-            if targets.get(dst, {}).get("type") == "group":
-                in_map[dst].append(src)
-            if targets.get(src, {}).get("type") == "group":
-                out_map[src].append(dst)
-
-        @functools.lru_cache(maxsize=None)
-        def _terminals(g: str) -> list[str]:
-            leaves: list[str] = []
-            for nxt in out_map.get(g, []):
-                if targets.get(nxt, {}).get("type") == "group":
-                    leaves.extend(_terminals(nxt))
-                else:
-                    leaves.append(nxt)
-            return leaves
-
-        for grp, preds in in_map.items():
-            leaves = _terminals(grp)
-            for p in preds:
-                for leaf in leaves:
-                    # avoid duplicate synthetic edge
-                    key = (p, leaf, "deps")
-                    if key in self._visited_edges:
-                        continue
-                    e = self.create_edge(p, leaf, label="deps")
-                    e["via_group"] = grp  # keep traceability
-                    ctx.add_edge(e)
-                    self._visited_edges.add(key)
-
-        nodes_to_remove = [
-            n for n in ctx.nodes() if targets.get(n, {}).get("type") == "group"
-        ]
-        for node in nodes_to_remove:
-            ctx.graph.remove_node(node)
-
-        # Get statistics after merging and print comparison
-        after_stats = self._get_graph_stats(ctx, targets)
-        self._print_graph_comparison(before_stats, after_stats)

@@ -53,6 +53,18 @@ class BasePropagateParser(BaseParser):
         """
         return self.config.literal2enum(condition)
 
+    def parse_edge_condition(self, edge_type: str) -> Optional[str]:
+        """
+        Parse the edge type string to the enum
+
+        Args:
+            - edge_type (str): The edge type string
+
+        Returns:
+            str: The edge type enum
+        """
+        return self.config.edge_literal2enum(edge_type)
+
     def reverse_topological_sort(self, graph: nx.DiGraph | nx.MultiDiGraph):
         """
         Reverse topological sort of the graph
@@ -235,6 +247,88 @@ class BasePropagateParser(BaseParser):
 
         return DualLicense([ret_group])
 
+    def should_propagate_through_edge(self, edge_data: dict, current_condition: Optional[str]) -> bool:
+        """
+        Check if licenses should propagate through the given edge based on edge type configuration.
+
+        Args:
+            - edge_data (dict): The edge data containing type and other attributes
+            - current_condition (str): The current node condition
+
+        Returns:
+            bool: True if propagation should occur, False otherwise
+        """
+        edge_type = edge_data.get("type", None)
+        if edge_type is None:
+            # No edge type specified, use default behavior
+            return self.config.default_edge_behavior != "block"
+
+        edge_condition = self.parse_edge_condition(edge_type)
+        if edge_condition is None:
+            # Edge type not mapped, use default behavior
+            if self.config.default_edge_behavior == "block":
+                return False
+            elif self.config.default_edge_behavior == "allow":
+                return True
+            else:  # inherit
+                return True
+
+        # Check if edge condition blocks propagation
+        if edge_condition in self.config.edge_isolations:
+            return False
+
+        # Consider node condition and edge condition combination
+        # If current node is in license_isolations, it may affect edge propagation
+        if current_condition and current_condition in self.config.license_isolations:
+            # For isolated nodes, only allow propagation through explicitly permitted edge types
+            if edge_condition not in self.config.edge_permissive_spreads:
+                return False
+
+        return True
+
+    def apply_edge_propagation_rules(self, dual_lic: DualLicense, edge_data: dict, current_condition: Optional[str]) -> DualLicense:
+        """
+        Apply edge-specific propagation rules to licenses.
+
+        Args:
+            - dual_lic (DualLicense): The licenses to propagate
+            - edge_data (dict): The edge data containing type and other attributes
+            - current_condition (str): The current node condition
+
+        Returns:
+            DualLicense: The modified licenses after applying edge rules
+        """
+        edge_type = edge_data.get("type", None)
+        if edge_type is None:
+            return dual_lic
+
+        edge_condition = self.parse_edge_condition(edge_type)
+        if edge_condition is None:
+            return dual_lic
+
+        # Apply edge-specific permissive spread rules
+        if edge_condition in self.config.edge_permissive_spreads:
+            # For edges in permissive spreads, treat similar to node-level permissive spreads
+            new = DualLicense()
+            for group in dual_lic:
+                new_group = set()
+                for lic in group:
+                    if not self.checker.is_license_exist(lic.unit_spdx):
+                        continue
+                    
+                    # Apply edge-specific propagation logic
+                    if self.checker.is_copyleft(lic.unit_spdx):
+                        new_group.add(DualUnit(lic["spdx_id"], current_condition, lic["exceptions"]))
+                    else:
+                        # Permissive license propagates through this edge type
+                        new_group.add(DualUnit(lic["spdx_id"], current_condition, lic["exceptions"]))
+                
+                if new_group:
+                    new.add(frozenset(new_group))
+            return new
+
+        return dual_lic
+
     def get_outbound(self, dual_lic: DualLicense, condition: Optional[str]) -> DualLicense:
         """
         Get the outbound licenses.
@@ -333,10 +427,54 @@ class BasePropagateParser(BaseParser):
                         if not dual_lic:
                             continue
 
-                        if child_outbound := context.nodes()[child].get("outbound", None):
+                        # Get all edges between current_node and child to check edge types
+                        edges_to_child = context.graph.get_edge_data(current_node, child)
+                        
+                        # If no edge configuration is available, use legacy behavior
+                        if not self.config.edge_literal_mapping and not self.config.edge_isolations:
+                            # Legacy behavior: no edge type consideration
+                            if child_outbound := context.nodes()[child].get("outbound", None):
+                                if not current_outbound:
+                                    current_outbound = child_outbound
+                                current_outbound = child_outbound & current_outbound
+                            continue
+
+                        # Process each edge to the child
+                        child_propagated_licenses = None
+                        if edges_to_child:
+                            # Handle multiple edges (MultiDiGraph case)
+                            if isinstance(edges_to_child, dict):
+                                for edge_key, edge_data in edges_to_child.items():
+                                    # Check if propagation should occur through this edge
+                                    if not self.should_propagate_through_edge(edge_data, current_condition):
+                                        continue
+                                    
+                                    # Apply edge-specific propagation rules
+                                    edge_modified_licenses = self.apply_edge_propagation_rules(
+                                        dual_lic, edge_data, current_condition
+                                    )
+                                    
+                                    if child_propagated_licenses is None:
+                                        child_propagated_licenses = edge_modified_licenses
+                                    else:
+                                        child_propagated_licenses = child_propagated_licenses & edge_modified_licenses
+                            else:
+                                # Single edge case
+                                if self.should_propagate_through_edge(edges_to_child, current_condition):
+                                    child_propagated_licenses = self.apply_edge_propagation_rules(
+                                        dual_lic, edges_to_child, current_condition
+                                    )
+                        else:
+                            # No edge data available, use default behavior
+                            if self.config.default_edge_behavior != "block":
+                                child_propagated_licenses = dual_lic
+
+                        # Merge with current outbound licenses if propagation occurred
+                        if child_propagated_licenses:
                             if not current_outbound:
-                                current_outbound = child_outbound
-                            current_outbound = child_outbound & current_outbound
+                                current_outbound = child_propagated_licenses
+                            else:
+                                current_outbound = child_propagated_licenses & current_outbound
 
                     if not current_outbound:
                         progress.update(task, advance=1)
