@@ -4,9 +4,10 @@ Hvigor Adapter for Parsing Hvigor Projects"""
 from pathlib import Path
 from typing import Union, Dict, Set
 
-from liscopelens.utils.graph import GraphManager, Vertex, Edge, Triple
-from .models import Project, Module, CodeFile, HvigorEntity, HvigorEdge
-from .constants import HvigorEdgeType
+from liscopelens.utils.graph import GraphManager, Vertex, Edge
+
+from .entity import Project, Module, CodeFile, HvigorEntity
+from .constants import HvigorEdgeType, HvigorVertexType
 
 
 class HvigorAdapter:
@@ -163,7 +164,7 @@ class HvigorAdapter:
         for dep in module.dependencies:
             if dep.is_local:
                 # Local file dependency - try to find the target module
-                target_entity = self._find_local_dependency(dep, module)
+                target_entity = self._find_local_dependency(dep)
                 if target_entity:
                     # Add dependency edge
                     dep_edge = Edge(
@@ -173,7 +174,7 @@ class HvigorAdapter:
             else:
                 # External ohpm dependency
                 # Create a virtual node for external dependency
-                ext_vertex = Vertex(label=dep.name, type="external_package", version=dep.version, is_external=True)
+                ext_vertex = Vertex(label=dep.name, type=HvigorVertexType.EXTERNAL_PACKAGE.value, version=dep.version, is_external=True)
                 self.graph.add_node(ext_vertex)
 
                 dep_edge = Edge(
@@ -181,13 +182,12 @@ class HvigorAdapter:
                 )
                 self.graph.add_edge(dep_edge)
 
-    def _find_local_dependency(self, dependency, source_module: Module):
+    def _find_local_dependency(self, dependency):
         """
         Find the target entity for a local file dependency.
 
         Args:
             dependency: Dependency object
-            source_module (Module): Module that declares the dependency
 
         Returns:
             HvigorEntity: Target entity if found, None otherwise
@@ -218,24 +218,25 @@ class HvigorAdapter:
             str: Vertex type string
         """
         if isinstance(entity, Project):
-            return "project"
-        elif isinstance(entity, Module):
+            return HvigorVertexType.PROJECT.value
+
+        if isinstance(entity, Module):
             if entity.is_native:
-                return "native_module"
-            else:
-                module_type = entity.module_profile.get("module", {}).get("type", "unknown")
-                return f"module_{module_type}"
-        elif isinstance(entity, CodeFile):
+                return HvigorVertexType.NATIVE_MODULE.value
+            # Use the new convenience method
+            module_type = entity.get_module_type()
+            return f"module_{module_type}"
+
+        if isinstance(entity, CodeFile):
             if entity.is_native_code:
-                return "native_code"
-            elif entity.is_arkts_code:
-                return "arkts_code"
-            elif entity.is_resource:
-                return "resource"
-            else:
-                return "file"
-        else:
-            return "unknown"
+                return HvigorVertexType.NATIVE_CODE.value
+            if entity.is_arkts_code:
+                return HvigorVertexType.ARKTS_CODE.value
+            if entity.is_resource:
+                return HvigorVertexType.RESOURCE.value
+            return HvigorVertexType.FILE.value
+
+        return HvigorVertexType.UNKNOWN.value
 
     def get_modules_not_in_build(self, project: Project) -> Set[Module]:
         """
@@ -247,22 +248,25 @@ class HvigorAdapter:
         Returns:
             Set[Module]: Modules not participating in build
         """
-        if not project.build_profile:
+        # Use model if available, otherwise fall back to dict
+        if project.build_profile_model and project.build_profile_model.modules:
+            configured_modules = {module.name for module in project.build_profile_model.modules}
+        elif project.build_profile:
+            configured_modules = set(project.module_configs.keys())
+        else:
             # No build profile means all modules participate
             return set()
 
-        configured_modules = set(project.module_configs.keys())
         all_modules = {module.name for module in project.discovered_modules}
-
         excluded_modules = all_modules - configured_modules
         return {module for module in project.discovered_modules if module.name in excluded_modules}
 
-    def export_graph(self, output_path: Union[str, Path], format: str = "json"):
+    def export_graph(self, output_path: Union[str, Path], save_format: str = "json"):
         """
         Export the graph to a file.
 
         Args:
             output_path (Union[str, Path]): Output file path
-            format (str): Export format ("json", "gml", "graphml")
+            save_format (str): Export format ("json", "gml", "graphml")
         """
-        self.graph.save(str(output_path), save_format=format)
+        self.graph.save(str(output_path), save_format=save_format)

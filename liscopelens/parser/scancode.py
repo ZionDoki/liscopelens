@@ -80,8 +80,9 @@ class ScancodeParser(BaseParser):
             "group": "scancode",
         },
         "--scancode-scan": {
-            "type": str,
-            "help": "Execute scancode scan on the specified target path",
+            "action": "store_true",
+            "help": "Execute scancode scan on the project path. Disabled by default.",
+            "default": False,
             "group": "scancode",
         },
         "--scancode-process": {
@@ -93,6 +94,12 @@ class ScancodeParser(BaseParser):
         "--output": {
             "type": str,
             "help": "The directory to save scancode's output json file",
+            "group": "scancode",
+        },
+        "--node-attr": {
+            "type": str,
+            "help": "Node attribute to match against (default: src_path)",
+            "default": "src_path",
             "group": "scancode",
         },
     }
@@ -491,23 +498,55 @@ class ScancodeParser(BaseParser):
             print(f"✗ {error_msg}")
             raise RuntimeError(error_msg) from e
 
-    def add_license(self, context: GraphManager, file_path: str, spdx_results: DualLicense, test):
-        """Add license information to the context node.
+    def add_license(self, context: GraphManager, file_path: str, spdx_results: DualLicense, test, project_root: Path):
+        """Add license information to the context node using Path-based matching.
 
         Args:
             context: GraphManager instance to modify
             file_path: Path of the file to which the license applies
             spdx_results: DualLicense object containing license information
             test: Test identifier for the license application
+            project_root: Root directory of the project being scanned
 
-        This method adds the license information to the context node corresponding to the file path."""
-        parent_label = "//" + file_path.replace("\\", "/")
-        context_node = context.query_node_by_label(parent_label)
+        This method adds the license information to the context node by matching
+        against the configured node attribute (default: src_path)."""
+        
+        # Use Path for proper path handling
+        target_path = project_root.resolve()
+        scan_file_path = Path(file_path).resolve()
+        
+        # Calculate relative path from project root
+        try:
+            relative_path = scan_file_path.relative_to(target_path)
+        except ValueError:
+            # If file is not under project root, use original logic
+            relative_path = Path(file_path)
+        
+        # Get the attribute to match against (default: src_path)
+        match_attr = getattr(self.args, "node_attr", "src_path")
+        
+        # Find matching node by attribute
+        matched_node = None
+        target_path_str = str(relative_path.as_posix())
+        
+        for _, node_data in context.nodes(data=True):
+            node_path = node_data.get(match_attr)
+            if node_path:
+                # Convert to Path for comparison
+                node_path_obj = Path(node_path)
+                if node_path_obj.as_posix() == target_path_str or str(node_path_obj) == target_path_str:
+                    matched_node = node_data
+                    break
+        
+        # Fallback to label-based matching for backward compatibility
+        if not matched_node:
+            parent_label = "//" + target_path_str
+            matched_node = context.query_node_by_label(parent_label)
 
-        if context_node and spdx_results:
-            context_node["licenses"] = spdx_results
-            context_node["test"] = test
-            self.count.add(parent_label)
+        if matched_node and spdx_results:
+            matched_node["licenses"] = spdx_results
+            matched_node["test"] = test
+            self.count.add(target_path_str)
 
     def _report_shadow_license_stats(self, license_usage: dict[str, set[str]]):
         """
@@ -533,18 +572,30 @@ class ScancodeParser(BaseParser):
 
     def _apply_shadow_licenses(self, context: GraphManager, shadow_patterns: dict[str, str]) -> dict[str, set[str]]:
         """
-        Apply shadow licenses using wildcard patterns, and return stats.
+        Apply shadow licenses using wildcard patterns with Path-based matching, and return stats.
 
         Returns:
             A dict mapping license string -> set of node IDs
         """
         spdx = SPDXParser()
         license_usage = defaultdict(set)
+        match_attr = getattr(self.args, "node_attr", "src_path")
 
         for node_id, node_data in context.nodes(data=True):
             if node_data.get("type") == "code":
+                # Get the path to match against
+                node_path = node_data.get(match_attr)
+                if not node_path:
+                    # Fallback to node_id for backward compatibility
+                    node_path = node_id
+                
+                # Convert to Path for proper matching
+                node_path_obj = Path(node_path)
+                node_path_str = node_path_obj.as_posix()
+                
                 for pattern, license_str in shadow_patterns.items():
-                    if fnmatch.fnmatch(node_id, pattern):
+                    # Use Path-aware pattern matching
+                    if fnmatch.fnmatch(node_path_str, pattern) or fnmatch.fnmatch(str(node_path_obj), pattern):
                         spdx_license = spdx(license_str)
                         if spdx_license:
                             context.modify_node_attribute(node_id, "licenses", spdx_license)
@@ -621,22 +672,33 @@ class ScancodeParser(BaseParser):
 
         return spdx_id
 
-    def parse_json(self, json_path: str, context: GraphManager):
-        """Parse the scancode JSON output file and add licenses to the context.
+    def parse_json(self, json_path: str, context: GraphManager, project_path: Path):
+        """Parse the scancode JSON output file and add licenses to the context using Path-based processing.
 
         Args:
             json_path: The path to the scancode JSON output file.
             context: GraphManager instance to modify.
+            project_path: Root path of the project being scanned.
 
         This method reads the scancode JSON file, extracts license detections,
-        and adds them to the context.
+        and adds them to the context with proper path handling.
         """
 
         if context is None:
             raise ValueError(f"Context can not be None in {self.__class__.__name__}.")
 
-        if root_path := getattr(self.args, "scancode_dir", None):
-            rel_path = os.path.relpath(os.path.dirname(json_path), root_path)
+        # Use Path for proper path handling
+        json_path_obj = Path(json_path)
+        project_path_obj = project_path.resolve()
+        
+        # For scancode_dir mode, calculate relative path using Path
+        scancode_dir = getattr(self.args, "scancode_dir", None)
+        if scancode_dir:
+            scancode_dir_obj = Path(scancode_dir).resolve()
+            try:
+                rel_path = json_path_obj.parent.relative_to(scancode_dir_obj)
+            except ValueError:
+                rel_path = None
         else:
             rel_path = None
 
@@ -645,36 +707,57 @@ class ScancodeParser(BaseParser):
 
             for detects in scancode_results["license_detections"]:
                 for match in detects["reference_matches"]:
-                    if rel_path:
-                        file_path = os.path.join(rel_path, match["from_file"])
-                    else:
-                        # ! Remove scancode project root, because gn profile json does not contain it.
-                        file_path = os.path.relpath(match["from_file"], match["from_file"].split(os.sep)[0])
+                    file_path = self._normalize_file_path(match["from_file"], rel_path, project_path_obj)
 
                     spdx_results = self.spdx_parser(
                         match["license_expression_spdx"],
-                        file_path,
+                        str(file_path),
                         proprocessor=self.remove_ref_lang if self.args.rm_ref_lang else None,
                     )
 
                     if spdx_results:
-                        self.add_license(context, file_path, spdx_results, match["license_expression_spdx"] + "_m")
+                        self.add_license(context, str(file_path), spdx_results,
+                                       match["license_expression_spdx"] + "_m", project_path_obj)
 
             for file in scancode_results["files"]:
-                if rel_path:
-                    file_path = os.path.join(rel_path, file["path"])
-                else:
-                    # ! Remove scancode project root, because gn profile json does not contain it.
-                    file_path = os.path.relpath(file["path"], file["path"].split(os.sep)[0])
+                file_path = self._normalize_file_path(file["path"], rel_path, project_path_obj)
 
                 if file["detected_license_expression_spdx"]:
-                    spdx_results = self.spdx_parser(file["detected_license_expression_spdx"], file_path)
+                    spdx_results = self.spdx_parser(file["detected_license_expression_spdx"], str(file_path))
+                    
+                    self.add_license(context, str(file_path), spdx_results,
+                                   file["detected_license_expression_spdx"] + "_f", project_path_obj)
 
-                    self.add_license(context, file_path, spdx_results, file["detected_license_expression_spdx"] + "_f")
-
-    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
+    def _normalize_file_path(self, scancode_file_path: str, rel_path: Optional[Path], project_root: Path) -> Path:
+        """Normalize file path from scancode output to project-relative path.
+        
+        Args:
+            scancode_file_path: File path from scancode output
+            rel_path: Relative path for scancode_dir mode
+            project_root: Project root directory
+            
+        Returns:
+            Normalized Path object relative to project root
         """
-        Parse scancode results or run scancode scan.
+        scancode_path = Path(scancode_file_path)
+        
+        if rel_path:
+            # For scancode_dir mode: combine rel_path with file path
+            file_path = rel_path / scancode_path
+        else:
+            # For single file mode: remove scancode project root
+            # Convert to relative path by removing the first component
+            parts = scancode_path.parts
+            if len(parts) > 1:
+                file_path = Path(*parts[1:])
+            else:
+                file_path = scancode_path
+        
+        return file_path
+
+    def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> GraphManager:
+        """
+        Parse scancode results or run scancode scan with Path-based processing.
 
         Usage:
         ```shell
@@ -684,26 +767,26 @@ class ScancodeParser(BaseParser):
         scancode --json-pp license.json /path/to/your/project
 
         # Run scancode scan directly
-        liscopelens --scancode-scan /path/to/target --scancode-ver 32.4.0 --python-ver 3.13
+        liscopelens /path/to/target --scancode-scan --scancode-ver 32.4.0 --python-ver 3.13
         ```
         """
 
         # Handle scancode scan execution
-        if getattr(self.args, "scancode_scan", None):
-            scan_target = self.args.scancode_scan
-            if not os.path.exists(scan_target):
-                raise FileNotFoundError(f"Scan target not found: {scan_target}")
+        if getattr(self.args, "scancode_scan", False):
+            scan_target = project_path
+            if not scan_target.exists():
+                raise FileNotFoundError(f"Project path not found: {scan_target}")
 
             print(f"Starting scancode scan on: {scan_target}")
-            output_file = self._run_scancode_scan(scan_target)
+            output_file = self._run_scancode_scan(str(scan_target))
 
-            # Parse the generated output
-            self.parse_json(output_file, context)
+            # Parse the generated output with project path
+            self.parse_json(output_file, context, scan_target)
 
         elif getattr(self.args, "scancode_file", None):
             if not os.path.exists(self.args.scancode_file):
                 raise FileNotFoundError(f"File not found: {self.args.scancode_file}")
-            self.parse_json(self.args.scancode_file, context)
+            self.parse_json(self.args.scancode_file, context, project_path)
 
         elif getattr(self.args, "scancode_dir", None):
             if not os.path.exists(self.args.scancode_dir):
@@ -711,7 +794,7 @@ class ScancodeParser(BaseParser):
             for root, _, files in track(os.walk(self.args.scancode_dir), "Parsing scancode's output..."):
                 for file in files:
                     if file.endswith(".json"):
-                        self.parse_json(os.path.join(root, file), context)
+                        self.parse_json(os.path.join(root, file), context, project_path)
 
             json.dump(
                 list(

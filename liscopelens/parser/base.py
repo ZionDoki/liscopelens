@@ -94,7 +94,7 @@ class BaseParser(ABC):
         return Edge(u, v, parser_name=self.__class__.__name__, **kwargs)
 
     @abstractmethod
-    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
+    def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> GraphManager:
         """
         Parse the arguments and update the context
 
@@ -134,7 +134,7 @@ class BaseParserEntry:
 
         self._parsers = (p(args, config) for p in self.parsers)
 
-    def parse(self, project_path: str, context: Optional[GraphManager] = None):
+    def parse(self, project_path: Path, context: Optional[GraphManager] = None):
         """
         Parse the arguments and update the context
 

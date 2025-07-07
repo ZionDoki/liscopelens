@@ -22,6 +22,7 @@ The basic parser for the exception licenses.
 
 import copy
 import warnings
+from pathlib import Path
 from argparse import Namespace
 
 from typing import Optional
@@ -61,7 +62,7 @@ class BaseExceptionParser(BaseParser):
         self.all_licenes = load_licenses()
         self.all_exceptions = load_exceptions()
 
-    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
+    def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> GraphManager:
 
         if context is None:
             raise ValueError("The context is required for the exception parser.")

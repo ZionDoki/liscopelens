@@ -17,6 +17,7 @@
 #
 
 import json
+from pathlib import Path
 from pprint import pformat
 from typing import Optional
 from argparse import Namespace
@@ -39,7 +40,7 @@ class EchoPaser(BaseParser):
     def __init__(self, args: Namespace, config: Config):
         super().__init__(args, config)
 
-    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
+    def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> GraphManager:
 
         need_echo = getattr(self.args, "echo", False)
         output = getattr(self.args, "output", "")

@@ -45,8 +45,13 @@ class HvigorVertexType(Enum):
 
     PROJECT = "project"
     MODULE = "module"
+    NATIVE_MODULE = "native_module"
     NATIVE_CODE = "native_code"
     ARKTS_CODE = "arkts_code"
+    RESOURCE = "resource"
+    FILE = "file"
+    UNKNOWN = "unknown"
+    EXTERNAL_PACKAGE = "external_package"
     MODULE_ENTRY = "module_entry"
     MODULE_HAR = "module_har"
     MODULE_SHARE = "module_share"

@@ -18,6 +18,7 @@
 import os
 import argparse
 import itertools
+from pathlib import Path
 
 from functools import reduce
 from typing import Optional, Any
@@ -386,7 +387,7 @@ class BasePropagateParser(BaseParser):
         # return self.get_strict_outbound(new, reverse=True)
         return new
 
-    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
+    def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> GraphManager:
         """
         Parse the licenses propagation.
 

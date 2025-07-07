@@ -23,6 +23,7 @@ import warnings
 import argparse
 import itertools
 from uuid import uuid4
+from pathlib import Path
 from typing import Generator, Optional
 
 import networkx as nx
@@ -207,7 +208,7 @@ class BaseCompatiblityParser(BaseParser):
 
         return True
 
-    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
+    def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> GraphManager:
         """
         Parse the compatibility of the licenses
 

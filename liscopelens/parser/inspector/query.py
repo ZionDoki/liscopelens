@@ -19,13 +19,14 @@
 
 import os
 import json
-from argparse import Namespace
+from pathlib import Path
 from typing import Optional
+from argparse import Namespace
 
 import networkx as nx
 from textual.app import App, ComposeResult
 from textual.widgets import Input, ListView, ListItem, Label, Button
-from textual.containers import  Horizontal
+from textual.containers import Horizontal
 
 from liscopelens.utils.structure import Config
 from liscopelens.utils.graph import GraphManager
@@ -60,7 +61,7 @@ class GraphVisualizer(App):
             yield Input(placeholder="Enter conlict license to filter search...", id="lic_input")
             yield Button("X", id="clear_lic_input")
         yield Label("Predecessors")
-       
+
         yield ListView(id="predecessors")
         with Horizontal():
             yield Label("Current Node: ", id="node_label")
@@ -182,17 +183,17 @@ class QueryParser(BaseParser):
     def __init__(self, args: Namespace, config: Config):
         super().__init__(args, config)
 
-    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> Optional[GraphManager]:
+    def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> Optional[GraphManager]:
         result_dir = getattr(self.args, "result-path", None)
         if result_dir is None:
             raise ValueError("Result path is required for query parser")
 
         json_path = os.path.join(result_dir, "compatible_checked.json")
         print(f"Loading graph from {json_path}...")
-        
+
         # 首先尝试加载 JSON 格式
         if os.path.exists(json_path):
-            with open(json_path, 'r', encoding='utf-8') as f:
+            with open(json_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             graph = nx.readwrite.json_graph.node_link_graph(data, edges="edges")
         else:

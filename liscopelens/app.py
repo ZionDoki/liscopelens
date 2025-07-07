@@ -21,6 +21,7 @@ This module provides the command line interface of the project.
 """
 
 import argparse
+from pathlib import Path
 
 from rich.pretty import Pretty
 from rich.console import Console
@@ -32,7 +33,9 @@ from .parser import PARSER_ENTRIES
 def cli():
     """Command line interface of the project."""
     parser = argparse.ArgumentParser(description="部件兼容性分析工具")
+    parser.add_argument("project_path", type=str, help="待检测项目路径")
     parser.add_argument("-c", "--config", type=str, default="", help="配置文件路径")
+
     console = Console()
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -66,9 +69,12 @@ def cli():
     else:
         console.print("[bold yellow]Using default configuration[/bold yellow]")
         config = load_config()
-        
+
     console.print(Pretty(config, expand_all=True))
 
-    PARSER_ENTRIES[args.command](args, config).parse("", None)
+    project_path = Path(args.project_path).resolve()
+    if not project_path.exists():
+        console.print(f"[bold red]Project path does not exist:[/bold red] {project_path}")
+        return
 
-    # TODO: return or output the result
+    PARSER_ENTRIES[args.command](args, config).parse(project_path, None)

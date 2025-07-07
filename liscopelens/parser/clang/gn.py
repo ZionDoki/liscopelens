@@ -28,15 +28,17 @@ The implementation is self-contained; no external flatten-in-advance logic is
 required. After parsing a GN graph file you will get a `GraphManager` where:
   • All original targets and edges are preserved.
   • Additional synthetic edges (label="deps", attr `via_group=<group name>`)
-    directly connect each predecessor of a group to that group’s non-group
+    directly connect each predecessor of a group to that group's non-group
     leaf nodes.
+  • Each node has a `src_path` attribute calculated from project root + GN label.
 You may safely ignore or delete the original group nodes when performing reach-
 ability or connected-component analysis."""
 
 import json
 import functools
-from collections import defaultdict
+from pathlib import Path
 from typing import Optional
+from collections import defaultdict
 
 from rich.progress import track
 from rich.console import Console
@@ -63,12 +65,59 @@ class GnParser(BaseParser):
         },
     }
 
-    def _ensure_vertex(self, ctx: GraphManager, name: str, vtype: str) -> None:
+    def _ensure_vertex(self, ctx: GraphManager, name: str, vtype: str, project_path: Path) -> None:
+        """Create vertex with src_path attribute calculated from project root and GN label."""
         key = (name, vtype)
         if key in self._visited_nodes:
             return
-        ctx.add_node(self.create_vertex(name, type=vtype))
+        
+        vertex = self.create_vertex(name, type=vtype)
+        
+        # Calculate src_path attribute
+        vertex["src_path"] = self._calculate_src_path(name, project_path)
+        
+        ctx.add_node(vertex)
         self._visited_nodes.add(key)
+
+    def _calculate_src_path(self, gn_label: str, project_path: Path) -> str:
+        """Calculate src_path from project root and GN label.
+        
+        Args:
+            gn_label: GN label (e.g., "//d/e/f/g" or "/path/to/file.c")
+            project_path: Project root path (e.g., "/a/b/c")
+            
+        Returns:
+            Combined path (e.g., "c/d/e/f/g")
+        """
+        # Use Path for proper path handling
+        project_path_obj = project_path.resolve()
+        project_name = project_path_obj.name
+        
+        if gn_label.startswith("//"):
+            # GN target label: remove "//" prefix and combine with project name
+            relative_label = gn_label[2:]  # Remove "//"
+            if relative_label:
+                return f"{project_name}/{relative_label}"
+            else:
+                return project_name
+        else:
+            # File path: calculate relative to project if absolute, otherwise use as-is
+            try:
+                label_path = Path(gn_label)
+                if label_path.is_absolute():
+                    # Try to make it relative to project root
+                    try:
+                        relative_path = label_path.relative_to(project_path_obj)
+                        return str(relative_path.as_posix())
+                    except ValueError:
+                        # If not under project root, use project name + relative path
+                        return f"{project_name}/{label_path.name}"
+                else:
+                    # Relative path: combine with project name
+                    return f"{project_name}/{gn_label}"
+            except Exception:
+                # Fallback: use project name + label
+                return f"{project_name}/{gn_label.lstrip('/')}"
 
     def _ensure_edge(self, ctx: GraphManager, src: str, dst: str, *, label: str) -> None:
         key = (src, dst, label)
@@ -179,7 +228,7 @@ class GnParser(BaseParser):
         after_stats = self._get_graph_stats(ctx, targets)
         self._print_graph_comparison(before_stats, after_stats)
 
-    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
+    def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> GraphManager:
         """Entry point called by the pipeline."""
         if context is None:
             context = GraphManager()
@@ -201,15 +250,15 @@ class GnParser(BaseParser):
         for tgt_name, meta in track(targets.items(), description="Parsing GN file…"):
             if ignore_test and meta.get("testonly", False):
                 continue
-            self._ensure_vertex(context, tgt_name, meta["type"])
+            self._ensure_vertex(context, tgt_name, meta["type"], project_path)
 
             for dep in meta.get("deps", []):
                 dep_type = targets[dep]["type"] if dep in targets else "external"
-                self._ensure_vertex(context, dep, dep_type)
+                self._ensure_vertex(context, dep, dep_type, project_path)
                 self._ensure_edge(context, tgt_name, dep, label="deps")
 
             for src in meta.get("sources", []):
-                self._ensure_vertex(context, src, "code")
+                self._ensure_vertex(context, src, "code", project_path)
                 self._ensure_edge(context, tgt_name, src, label="sources")
 
         # Phase 2: merge/collapse group chains into direct deps
