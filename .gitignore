@@ -27,3 +27,6 @@ venv
 
 output
 .roo
+.hvigor
+.vscode
+.DS_Store
