@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "liscopelens"
-version = "0.1.2"
+version = "0.1.5"
 description = "A tool to analyze the compatibility of licenses in a project."
 authors = ["Bird <bird@lzu.edu.cn>", "ZI0N <liuza20@lzu.edu.cn>", "Zihao Zhang <zhzihao2023@lzu.edu.cn>"]
 readme = "README.md"

@@ -1,0 +1,7 @@
+human_review = true
+default_target = ["GPL-2.0-only", "GPL-2.0-or-later"]
+
+[special.relicense]
+protect_scope = ["DYNAMIC_LINKING", "STATIC_LINKING"]
+escape_scope = []
+target = ["public-domain"]

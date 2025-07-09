@@ -49,6 +49,18 @@ class BaseCompatiblityParser(BaseParser):
         super().__init__(args, config)
         self.checker = Checker()
 
+    def parse_condition(self, condition: str) -> Optional[str]:
+        """
+        Parse the condition string to the enum using config's literal mapping
+
+        Args:
+            - condition (str): The condition string to parse
+
+        Returns:
+            Optional[str]: The parsed enum value, or None if no mapping exists
+        """
+        return self.config.literal2enum(condition)
+
     def topological_traversal(self, graph: nx.DiGraph) -> Generator[str, None, None]:
         """Topological sort the graph."""
         return nx.topological_sort(graph)
@@ -70,7 +82,8 @@ class BaseCompatiblityParser(BaseParser):
             yield node, parents, children
 
     def check_compatiblity(
-        self, license_a: str, license_b: str, scope_a: Scope, scope_b: Scope, ignore_unk=False
+        self, license_a: str, license_b: str, scope_a: Scope, scope_b: Scope, ignore_unk=False,
+        condition_type: Optional[str] = None
     ) -> CompatibleType:
         """
         Check the compatibility between two licenses
@@ -95,6 +108,13 @@ class BaseCompatiblityParser(BaseParser):
         if ignore_unk:
             compatible_results += (CompatibleType.UNKNOWN,)
 
+        # Convert condition type to enum if provided
+        if condition_type:
+            condition_enum = self.parse_condition(condition_type)
+            if condition_enum:
+                scope_a = Scope({condition_enum: set()}) if scope_a is None else scope_a
+                scope_b = Scope({condition_enum: set()}) if scope_b is None else scope_b
+
         license_a2b = self.checker.check_compatibility(license_a, license_b, scope=scope_a)
         license_b2a = self.checker.check_compatibility(license_b, license_a, scope=scope_b)
 
@@ -111,6 +131,7 @@ class BaseCompatiblityParser(BaseParser):
         dual_lic: DualLicense,
         blacklist: Optional[list[str]] = None,
         ignore_unk: bool = False,
+        condition_type: Optional[str] = None,
     ) -> tuple[DualLicense, set[frozenset[str]]]:
         """
         Check the compatibility of the dual license, filter group that contains the blacklist license or conflict license.
@@ -175,7 +196,14 @@ class BaseCompatiblityParser(BaseParser):
                 scope_a = Scope({license_a["condition"]: set()}) if license_a["condition"] else license_a["condition"]
                 scope_b = Scope({license_b["condition"]: set()}) if license_b["condition"] else license_b["condition"]
 
-                result = self.check_compatiblity(license_a.unit_spdx, license_b.unit_spdx, scope_a, scope_b, ignore_unk)
+                result = self.check_compatiblity(
+                    license_a.unit_spdx,
+                    license_b.unit_spdx,
+                    scope_a,
+                    scope_b,
+                    ignore_unk,
+                    condition_type
+                )
                 if result == CompatibleType.INCOMPATIBLE:
                     conflicts.add(frozenset((license_a.unit_spdx, license_b.unit_spdx)))
                     group_rm_flag = True
@@ -226,6 +254,9 @@ class BaseCompatiblityParser(BaseParser):
         ignore_unk = getattr(self.args, "ignore_unk", False)
         blacklist = getattr(self.config, "blacklist", [])
 
+        # 节点类型到预设类型的映射缓存，避免重复转换
+        condition_cache: dict[str, Optional[str]] = {}
+
         if not context:
             raise ValueError("The context should not be None")
 
@@ -237,13 +268,24 @@ class BaseCompatiblityParser(BaseParser):
                 for current_node, parents, _ in self.generate_processing_sequence(context.graph.subgraph(sub).copy()):
 
                     dual_before_check = context.nodes()[current_node].get("before_check", None)
+                    node_type = context.nodes()[current_node].get("type", None)
+
+                    # 获取节点的预设类型
+                    if node_type:
+                        if node_type not in condition_cache:
+                            condition_cache[node_type] = self.parse_condition(node_type)
+                        condition_enum = condition_cache[node_type]
+                    else:
+                        condition_enum = None
 
                     if dual_before_check is None:
                         progress.update(task, advance=1)
                         continue
 
+                    # 在兼容性检查时传入条件类型
                     dual_after_check, conflicts = self.filter_dual_license(
-                        dual_before_check, blacklist=blacklist, ignore_unk=ignore_unk
+                        dual_before_check, blacklist=blacklist, ignore_unk=ignore_unk,
+                        condition_type=condition_enum
                     )
 
                     current_outbound = context.nodes()[current_node].get("outbound", None)

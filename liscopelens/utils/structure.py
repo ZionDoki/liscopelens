@@ -1012,6 +1012,14 @@ def load_config(path: Optional[str] = None) -> Config:
 
     if path is None:
         path = str(get_resource_path(file_name="default.toml", resource_name="config"))
+    else:
+        # 检查是否带有.toml后缀
+        if path.endswith('.toml'):
+            # 如果带有.toml后缀，按照标准路径查找
+            pass  # 保持原路径不变
+        else:
+            # 如果不带.toml后缀，去config/目录下查找默认配置（拼接.toml）
+            path = str(get_resource_path(file_name=f"{path}.toml", resource_name="config"))
 
     return Config.from_toml(path)
 
