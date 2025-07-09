@@ -39,3 +39,7 @@ escape_scope = []
 [must.include_install_instruction]
 protect_scope = []
 escape_scope = []
+
+[cannot.impose_further_restriction]
+protect_scope = []
+escape_scope = ["TRADEMARK"]

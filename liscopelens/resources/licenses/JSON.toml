@@ -1,30 +1,33 @@
-human_review = false
-
-[can.commercial_use]
-protect_scope = []
-escape_scope = []
-
-[can.private_use]
-protect_scope = []
-escape_scope = []
+human_review = true
 
 [can.modify]
 protect_scope = []
 escape_scope = []
 
-[can.distribute]
+[can.private_use]
+escape_scope = []
 protect_scope = []
-escape_scope = []
 
-[cannot.use_trademark]
-protect_scope = [ "TRADEMARK",]
+[can.commercial_use]
 escape_scope = []
+protect_scope = []
+
+[can.distribute]
+escape_scope = []
+protect_scope = []
+
+[must.include_copyright]
+escape_scope = []
+protect_scope = []
+
+[must.include_license]
+escape_scope = []
+protect_scope = []
 
 [cannot.provide_warranty]
-protect_scope = []
 escape_scope = []
+protect_scope = []
 
-# 待评审
-[cannot.give_credit]
+[cannot.use_for_evil]
 protect_scope = []
 escape_scope = []

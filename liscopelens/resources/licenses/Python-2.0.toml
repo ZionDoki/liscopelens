@@ -1,4 +1,4 @@
-human_review = false
+human_review = true
 
 [can.commercial_use]
 protect_scope = []
@@ -13,7 +13,7 @@ protect_scope = []
 escape_scope = []
 
 [cannot.use_trademark]
-protect_scope = [ "TRADEMARK",]
+protect_scope = ["TRADEMARK"]
 escape_scope = []
 
 [cannot.provide_warranty]
@@ -29,5 +29,9 @@ protect_scope = []
 escape_scope = []
 
 [must.state_changes]
+protect_scope = []
+escape_scope = []
+
+[must.follow_territorial_law]
 protect_scope = []
 escape_scope = []
