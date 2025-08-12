@@ -63,6 +63,12 @@ class GnParser(BaseParser):
             "default": True,
             "group": "gn",
         },
+        "--merge-groups": {
+            "action": "store_true",
+            "help": "Merge/collapse group nodes and create direct edges to non-group targets.",
+            "default": False,
+            "group": "gn",
+        },
     }
 
     def _ensure_vertex(self, ctx: GraphManager, name: str, vtype: str, project_path: Path) -> None:
@@ -115,7 +121,7 @@ class GnParser(BaseParser):
                 else:
                     # Relative path: combine with project name
                     return f"{project_name}/{gn_label}"
-            except Exception:
+            except (ValueError, OSError):
                 # Fallback: use project name + label
                 return f"{project_name}/{gn_label.lstrip('/')}"
 
@@ -238,6 +244,7 @@ class GnParser(BaseParser):
         self._visited_edges = set()
 
         ignore_test: bool = getattr(self.args, "ignore_test", True)
+        merge_groups: bool = getattr(self.args, "merge_groups", True)
 
         gn_file: Optional[str] = self.args.gn_file
         if not gn_file:
@@ -261,6 +268,21 @@ class GnParser(BaseParser):
                 self._ensure_vertex(context, src, "code", project_path)
                 self._ensure_edge(context, tgt_name, src, label="sources")
 
-        # Phase 2: merge/collapse group chains into direct deps
-        self._merge_groups(context, targets)
+        # Phase 2: merge/collapse group chains into direct deps (if enabled)
+        if merge_groups:
+            console = Console()
+            console.print("[cyan]Group merging is enabled. Collapsing group nodes...[/cyan]")
+            self._merge_groups(context, targets)
+        else:
+            console = Console()
+            console.print("[yellow]Group merging is disabled. Keeping all group nodes in the graph.[/yellow]")
+            # Print current graph statistics
+            stats = self._get_graph_stats(context, targets)
+            table = Table(title="Graph Statistics (Without Merging)")
+            table.add_column("Statistic", style="cyan")
+            table.add_column("Value", style="green")
+            for key, value in stats.items():
+                table.add_row(str(key), str(value))
+            console.print(table)
+
         return context

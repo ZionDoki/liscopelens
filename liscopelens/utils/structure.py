@@ -767,10 +767,10 @@ class DualLicense(set[frozenset[DualUnit]]):
                 # Also check if it's a regular license
                 if not checker.is_license_exist(exception_spdx_id):
                     raise ValueError(f"Invalid exception SPDX ID: {exception_spdx_id}")
-        except Exception:
+        except OSError as exc:
             # Fallback to basic license check if loading exceptions fails
             if not checker.is_license_exist(exception_spdx_id):
-                raise ValueError(f"Invalid exception SPDX ID: {exception_spdx_id}")
+                raise ValueError(f"Invalid exception SPDX ID: {exception_spdx_id}") from exc
         
         new_dual_license = DualLicense()
         
@@ -819,6 +819,12 @@ class DualLicense(set[frozenset[DualUnit]]):
                 merged[hash_val] = du
 
         return set(merged.values())
+
+    def iter_spdx_ids(self):
+        """Iterate over all SPDX IDs in the license, including exceptions."""
+        for group in self:
+            for unit in group:
+                yield unit.unit_spdx
 
 
 class SPDXParser:

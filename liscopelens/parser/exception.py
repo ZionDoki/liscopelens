@@ -22,7 +22,6 @@ The basic parser for the exception licenses.
 
 import copy
 import warnings
-from pathlib import Path
 from argparse import Namespace
 
 from typing import Optional
@@ -62,7 +61,7 @@ class BaseExceptionParser(BaseParser):
         self.all_licenes = load_licenses()
         self.all_exceptions = load_exceptions()
 
-    def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> GraphManager:
+    def parse(self, project_path: str, context: Optional[GraphManager] = None) -> GraphManager:
 
         if context is None:
             raise ValueError("The context is required for the exception parser.")
@@ -75,15 +74,8 @@ class BaseExceptionParser(BaseParser):
 
         for _, node_data in context.nodes(data=True):
             dual_license = node_data.get("licenses")
-
-            if node_data.get("src_path") == "eftool/LICENSE":
-                print(1)
-
             if not dual_license:
                 continue
-
-            if node_data.get("src_path") == "eftool/LICENSE":
-                print(2, node_data)
 
             for group in dual_license:
                 for unit in group:
@@ -93,19 +85,13 @@ class BaseExceptionParser(BaseParser):
                             warnings.warn(f"Unknown license: {unit['spdx_id']}")
                         continue
 
-                    if node_data.get("src_path") == "eftool/LICENSE":
-                        print(3)
-
                     new_feat = self.all_licenes[unit["spdx_id"]]
-                    if node_data.get("src_path") == "eftool/LICENSE":
-                        print(unit)
                     for exception in unit["exceptions"]:
                         if exception not in self.all_exceptions:
                             if not ignore_unk:
                                 raise ValueError(f"Unknown exception: {exception}")
                             continue
 
-                        print(exception)
                         new_feat = new_feat.cover_from(self.all_exceptions[exception])
 
                     if new_feat == self.all_licenes[unit["spdx_id"]]:
