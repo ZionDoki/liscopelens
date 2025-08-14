@@ -688,6 +688,75 @@ class DualLicense(set[frozenset[DualUnit]]):
     def copy(self) -> "DualLicense":
         return self.__class__(super().copy())
 
+    def to_spdx_expression(self, factor_common=True) -> str:
+        """
+        Convert the DualLicense to a canonical SPDX expression string (with simplification).
+
+        Canonicalization rules (same as your docstring) + Simplification:
+        - Ignore DualUnit.condition entirely.
+        - Deduplicate identical licenses within a group after ignoring condition.
+        - Represent exceptions using standard "WITH": "License WITH Exception".
+        - For multiple exceptions on the same license, choose the first in lexicographic order.
+        - Groups are AND-joined; top-level set is OR-joined.
+        - Deterministic ordering (lexicographic) for stability.
+        - Simplification (absorption): remove any group that is a strict superset of another group.
+        """
+        if not self:
+            return ""
+
+        def unit_token(u: DualUnit) -> str:
+            spdx_id = (u.get("spdx_id") or "").strip()
+            if not spdx_id:
+                return ""
+            excs = sorted(set(u.get("exceptions") or []))
+            return f"{spdx_id} WITH {excs[0]}" if excs else spdx_id
+
+        canon_groups: set[frozenset[str]] = set()
+        for group in self:
+            tokens = {unit_token(u) for u in group}
+            tokens.discard("")
+            if tokens:
+                canon_groups.add(frozenset(tokens))
+        if not canon_groups:
+            return ""
+
+        minimal_groups: list[frozenset[str]] = []
+        for g in sorted(canon_groups, key=lambda s: (len(s), sorted(s))):
+            if any(h.issubset(g) for h in minimal_groups):
+                continue
+            minimal_groups = [h for h in minimal_groups if not g.issubset(h) or g == h]
+            minimal_groups.append(g)
+
+        common: set[str] = set(minimal_groups[0])
+        for g in minimal_groups[1:]:
+            common &= g
+
+        def fmt_group(g: frozenset[str]) -> str:
+            toks = sorted(g)
+            if not toks:
+                return ""  # 空组意味着 True（已在因子提取中消化）
+            expr = " AND ".join(toks)
+            return f"({expr})" if len(toks) > 1 else expr
+
+        if factor_common and common:
+            residuals = [frozenset(g - common) for g in minimal_groups]
+            # 若有某个 residual 为空，说明 OR 部分为 True，整体就是公共因子本身
+            if any(len(r) == 0 for r in residuals):
+                outer = " AND ".join(sorted(common))
+                return outer
+
+            # 正常：Common AND ( r1 OR r2 OR ... )
+            outer = " AND ".join(sorted(common))
+            inner = " OR ".join(sorted({fmt_group(r) for r in residuals}))
+            if " OR " in inner:
+                inner = f"({inner})"
+            return f"{outer} AND {inner}"
+
+        # 4) 常规输出（无提因子）
+        group_exprs = [fmt_group(g) for g in minimal_groups]
+        group_exprs = sorted(set(group_exprs))
+        return " OR ".join(group_exprs)
+
     def add_condition(self, conditon: Optional[str]) -> "DualLicense":
         """
         Add a condition to the licenses.
@@ -739,27 +808,27 @@ class DualLicense(set[frozenset[DualUnit]]):
     def apply_exception_to_targets(self, exception_spdx_id: str, target_spdx_ids: list[str]) -> "DualLicense":
         """
         Apply exception license to specific target licenses within this DualLicense.
-        
+
         This method adds the exception to all DualUnit instances that match the target SPDX IDs.
-        
+
         Args:
             exception_spdx_id: SPDX ID of the exception license
             target_spdx_ids: List of target license SPDX IDs that this exception should apply to
-            
+
         Returns:
             DualLicense: New DualLicense instance with exceptions applied
-            
+
         Raises:
             ValueError: If target_spdx_ids contains invalid SPDX IDs
         """
         from liscopelens.checker import Checker
-        
+
         # Validate target SPDX IDs
         checker = Checker()
         for target_id in target_spdx_ids:
             if not checker.is_license_exist(target_id):
                 raise ValueError(f"Invalid target SPDX ID: {target_id}")
-        
+
         # For exceptions, we check if they exist in the exceptions list instead
         try:
             exceptions = load_exceptions()
@@ -771,9 +840,9 @@ class DualLicense(set[frozenset[DualUnit]]):
             # Fallback to basic license check if loading exceptions fails
             if not checker.is_license_exist(exception_spdx_id):
                 raise ValueError(f"Invalid exception SPDX ID: {exception_spdx_id}") from exc
-        
+
         new_dual_license = DualLicense()
-        
+
         for group in self:
             new_group = set()
             for unit in group:
@@ -783,11 +852,7 @@ class DualLicense(set[frozenset[DualUnit]]):
                     current_exceptions = unit.get("exceptions", [])
                     if exception_spdx_id not in current_exceptions:
                         new_exceptions = current_exceptions + [exception_spdx_id]
-                        new_unit = DualUnit(
-                            unit["spdx_id"],
-                            unit.get("condition"),
-                            new_exceptions
-                        )
+                        new_unit = DualUnit(unit["spdx_id"], unit.get("condition"), new_exceptions)
                         new_group.add(new_unit)
                     else:
                         # Exception already exists, keep original
@@ -795,9 +860,9 @@ class DualLicense(set[frozenset[DualUnit]]):
                 else:
                     # No match, keep original unit
                     new_group.add(unit)
-            
+
             new_dual_license.add(frozenset(new_group))
-        
+
         return new_dual_license
 
     @staticmethod
@@ -1020,7 +1085,7 @@ def load_config(path: Optional[str] = None) -> Config:
         path = str(get_resource_path(file_name="default.toml", resource_name="config"))
     else:
         # 检查是否带有.toml后缀
-        if path.endswith('.toml'):
+        if path.endswith(".toml"):
             # 如果带有.toml后缀，按照标准路径查找
             pass  # 保持原路径不变
         else:
@@ -1043,3 +1108,11 @@ class DualLicenseEncoder(json.JSONEncoder):
         if isinstance(o, Scope):
             return dict(o)
         return super().default(o)
+
+
+if __name__ == "__main__":
+    print(
+        SPDXParser()(
+            "MIT AND (MIT AND (GPL-3.0 OR Apache-2.0)) AND (Apache-2.0 WITH c OR GPL WITH a) "
+        ).to_spdx_expression()
+    )

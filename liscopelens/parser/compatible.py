@@ -250,7 +250,7 @@ class BaseCompatiblityParser(BaseParser):
         Returns:
             GraphManager: The context of the graph
         """
-        conflicts_table: dict[str, set[frozenset[str]]] = {}
+        global_conflicts_table: dict[str, set[frozenset[str]]] = {}
         ignore_unk = getattr(self.args, "ignore_unk", False)
         blacklist = getattr(self.config, "blacklist", [])
 
@@ -265,7 +265,21 @@ class BaseCompatiblityParser(BaseParser):
             total_nodes = len(context.graph.nodes)
             task = progress.add_task("[red]Parsing compatibility...", total=total_nodes)
             for sub in nx.weakly_connected_components(context.graph):
+                # Conflict patterns within this weakly connected component
+                local_conflicts_table: dict[str, set[frozenset[str]]] = {}
                 for current_node, parents, _ in self.generate_processing_sequence(context.graph.subgraph(sub).copy()):
+                    
+                    def _mark_parent_edges_with_conflict(parent_node: str, child_node: str, conflict_id: str) -> None:
+                        """Mark all edges from parent_node to child_node with the conflict id."""
+                        edges_dict = context.graph.get_edge_data(parent_node, child_node)
+                        if isinstance(edges_dict, dict):
+                            for key, edata in edges_dict.items():
+                                cg = edata.get("conflict_group", set())
+                                if not isinstance(cg, set):
+                                    cg = set(cg) if isinstance(cg, (list, tuple)) else set()
+                                if conflict_id not in cg:
+                                    cg.add(conflict_id)
+                                    context.graph[parent_node][child_node][key]["conflict_group"] = cg
 
                     dual_before_check = context.nodes()[current_node].get("before_check", None)
                     node_type = context.nodes()[current_node].get("type", None)
@@ -305,13 +319,17 @@ class BaseCompatiblityParser(BaseParser):
 
                         parent_conflict_flag = True
                         for conflict_id in conflict_group:
-                            conflict_pattern = conflicts_table.get(conflict_id, set())
+                            conflict_pattern = local_conflicts_table.get(conflict_id, None)
+                            if conflict_pattern is None:
+                                conflict_pattern = global_conflicts_table.get(conflict_id, set())
 
                             # _ here to check if current node has contribution to the conflict then add conflict_id to it
                             if self.is_conflict_happened(dual_after_check, conflict_pattern):
                                 context.nodes()[current_node]["conflict_group"] = (
                                     context.nodes()[current_node].get("conflict_group", set()).union({conflict_id})
                                 )
+                                # Mark parent->current edges as conflict edges
+                                _mark_parent_edges_with_conflict(parent, current_node, conflict_id)
 
                             if dual_after_check:
                                 continue
@@ -325,6 +343,7 @@ class BaseCompatiblityParser(BaseParser):
                                 context.nodes()[current_node]["conflict_group"] = (
                                     context.nodes()[current_node].get("conflict_group", set()).union({conflict_id})
                                 )
+                                _mark_parent_edges_with_conflict(parent, current_node, conflict_id)
 
                             if not new_pattern:
                                 new_pattern_flag = False
@@ -336,31 +355,39 @@ class BaseCompatiblityParser(BaseParser):
                     if not parent_conflict_flag:
 
                         uuid = str(uuid4())
-                        for conflict_id, conflict_set in conflicts_table.items():
+                        for conflict_id, conflict_set in local_conflicts_table.items():
                             if conflicts == conflict_set:
                                 uuid = conflict_id
                                 break
 
-                        conflicts_table[uuid] = conflicts
+                        local_conflicts_table[uuid] = conflicts
                         context.nodes()[current_node]["conflict_group"] = {uuid}
                         context.nodes()[current_node]["first"] = True
+                        # Mark edges from all parents to current for context
+                        for p in parents:
+                            _mark_parent_edges_with_conflict(p, current_node, uuid)
 
                     elif new_pattern_flag:
 
                         uuid = str(uuid4())
-                        for conflict_id, conflict_set in conflicts_table.items():
+                        for conflict_id, conflict_set in local_conflicts_table.items():
                             if new_pattern == conflict_set:
                                 uuid = conflict_id
                                 break
 
-                        conflicts_table[uuid] = new_pattern
+                        local_conflicts_table[uuid] = new_pattern
                         context.nodes()[current_node]["conflict_group"] = (
                             context.nodes()[current_node].get("conflict_group", set({})).union({uuid})
                         )
+                        for p in parents:
+                            _mark_parent_edges_with_conflict(p, current_node, uuid)
 
                     progress.update(
                         task, advance=1, description=f"[red]Processing compatibility {time.time() - start_time:.2f}s"
                     )
+
+                # Merge this component's conflict patterns into global mapping
+                global_conflicts_table.update(local_conflicts_table)
 
         if output := getattr(self.args, "output", None):
             os.makedirs(output, exist_ok=True)
@@ -376,9 +403,9 @@ class BaseCompatiblityParser(BaseParser):
                     continue
 
                 for conflict_id in conflict_group:
-                    ret_results[conflict_id] = ret_results.get(conflict_id, {"conflicts": conflicts_table[conflict_id]})
+                    ret_results[conflict_id] = ret_results.get(conflict_id, {"conflicts": global_conflicts_table[conflict_id]})
 
-                    for lic in itertools.chain(*conflicts_table[conflict_id]):
+                    for lic in itertools.chain(*global_conflicts_table[conflict_id]):
                         if lic not in [lic.unit_spdx for lic in itertools.chain(*current_licenses)]:
                             continue
 

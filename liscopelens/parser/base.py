@@ -149,9 +149,6 @@ class BaseParserEntry:
             ! output, you should implement that logic in the subclass parse method.
         """
 
-        if context is None:
-            context = GraphManager()
-
         for p in self._parsers:
             context = p.parse(project_path, context)
         # Add arguments to arg_parser here if needed

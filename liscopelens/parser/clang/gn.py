@@ -39,6 +39,7 @@ import functools
 from pathlib import Path
 from typing import Optional
 from collections import defaultdict
+import networkx as nx
 
 from rich.progress import track
 from rich.console import Console
@@ -136,6 +137,11 @@ class GnParser(BaseParser):
         """Get graph statistics"""
         total_nodes = len(ctx.nodes())
         total_edges = len(list(ctx.edges()))
+        # Weakly connected components on the directed MultiDiGraph
+        try:
+            weak_components = nx.number_weakly_connected_components(ctx.graph)
+        except Exception:
+            weak_components = 0
 
         group_nodes = 0
         non_group_nodes = 0
@@ -165,6 +171,7 @@ class GnParser(BaseParser):
             "Deps Edges": deps_edges,
             "Sources Edges": sources_edges,
             "Via Group Edges": via_group_edges,
+            "Weak Components": weak_components,
         }
 
     def _print_graph_comparison(self, before_stats: dict, after_stats: dict) -> None:

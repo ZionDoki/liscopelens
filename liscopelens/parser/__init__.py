@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-from .clang.entry import CParserEntry
+from .clang.entry import CParserEntry, CExportSubgraphEntry
 from .inspector.entry import QueryEntry
 
-PARSER_ENTRIES = {"clang": CParserEntry, "inspect": QueryEntry}
+PARSER_ENTRIES = {"clang": CParserEntry, "inspect": QueryEntry, "subgraph": CExportSubgraphEntry}
