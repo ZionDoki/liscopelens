@@ -1,4 +1,4 @@
-human_review = false
+human_review = true
 
 [can.commercial_use]
 protect_scope = []
@@ -21,10 +21,5 @@ protect_scope = [ "TRADEMARK",]
 escape_scope = []
 
 [cannot.provide_warranty]
-protect_scope = []
-escape_scope = []
-
-# 待评审
-[cannot.give_credit]
 protect_scope = []
 escape_scope = []

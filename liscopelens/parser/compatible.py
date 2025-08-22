@@ -405,11 +405,24 @@ class BaseCompatiblityParser(BaseParser):
                 for conflict_id in conflict_group:
                     ret_results[conflict_id] = ret_results.get(conflict_id, {"conflicts": global_conflicts_table[conflict_id]})
 
+                    # 收集通过sources边关联的许可证
+                    sources_licenses = set()
+                    for _, child_node, edge_data in context.graph.out_edges(node, data=True):
+                        if edge_data.get("label") == "sources":
+                            child_licenses = context.nodes()[child_node].get("licenses", None)
+                            if child_licenses:
+                                for lic in itertools.chain(*child_licenses):
+                                    sources_licenses.add(lic.unit_spdx)
+
                     for lic in itertools.chain(*global_conflicts_table[conflict_id]):
                         if lic not in [lic.unit_spdx for lic in itertools.chain(*current_licenses)]:
                             continue
 
-                        if lic not in [lic.unit_spdx for lic in itertools.chain(*outbound)]:
+                        # 检查许可证是否在outbound（deps传播）或sources中
+                        in_outbound = lic in [lic.unit_spdx for lic in itertools.chain(*outbound)]
+                        in_sources = lic in sources_licenses
+                        
+                        if not in_outbound and not in_sources:
                             continue
 
                         node_identifier = node

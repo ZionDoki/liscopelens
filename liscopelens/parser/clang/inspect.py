@@ -134,26 +134,60 @@ class ClangInspectParser(BaseParser):
                     if isinstance(cobj, dict) and str(cobj.get("id")) == str(cid) and data.get("type") != "code":
                         sub_nodes.add(node)
 
-            # Optionally include unrelated deps-leaf nodes (without conflict)
+            # Always include sources files that are involved in conflicts for this conflict_id
+            # Load results.json to get conflict-related source files
+            results_path = Path(project_path) / "results.json"
+            if results_path.exists():
+                try:
+                    with open(results_path, "r", encoding="utf-8") as rf:
+                        results = json.load(rf)
+
+                    conflict_data = results.get(str(cid), {})
+                    # For each license in the conflict, collect the associated files
+                    for license_key, file_list in conflict_data.items():
+                        if license_key != "conflicts" and isinstance(file_list, list):
+                            # Find nodes that correspond to these source files
+                            for file_path in file_list:
+                                # Look for nodes with matching path or src_path
+                                for node, data in context.nodes(data=True):
+                                    node_path = data.get("path") or data.get("src_path")
+                                    if node_path and node_path == file_path:
+                                        sub_nodes.add(node)
+                                        break
+                except (OSError, json.JSONDecodeError, UnicodeError):
+                    pass
+
+            # Optionally include all child nodes (deps/sources) of sampled nodes
             if include_unrelated:
                 additional: Set[str] = set()
-                visited: Set[str] = set()
-                stack = list(sub_nodes)
-                while stack:
-                    cur = stack.pop()
-                    if cur in visited:
-                        continue
-                    visited.add(cur)
-                    for s in deps_children(cur):
-                        sdata = context.get_node_data(s) or {}
-                        grp = sdata.get("conflict_group")
-                        has_conflict = isinstance(grp, (list, set, tuple)) and len(grp) > 0
-                        if not has_conflict:
-                            if len(deps_children(s)) == 0:
-                                additional.add(s)
-                            else:
-                                stack.append(s)
+                # For each node in the current subgraph, include all its children that aren't already in sub_nodes
+                for node in list(sub_nodes):
+                    # Include all deps children
+                    for child in deps_children(node):
+                        if child not in sub_nodes:
+                            child_data = context.get_node_data(child) or {}
+                            if child_data.get("before_check"):  # Only include if before_check is not empty
+                                additional.add(child)
+                    # Include all sources children (outgoing edges to source files)
+                    for _, v, d in context.graph.out_edges(node, data=True):
+                        if d.get("label") == "sources" and v not in sub_nodes:
+                            child_data = context.get_node_data(v) or {}
+                            if child_data.get("before_check"):  # Only include if before_check is not empty
+                                additional.add(v)
                 sub_nodes.update(additional)
+            else:
+                # Even when not including unrelated nodes, we should include sources files
+                # that are directly involved in conflicts
+                additional_sources: Set[str] = set()
+                for node in list(sub_nodes):
+                    # Include sources children that have conflict_group containing this cid
+                    for _, v, d in context.graph.out_edges(node, data=True):
+                        if d.get("label") == "sources" and v not in sub_nodes:
+                            child_data = context.get_node_data(v) or {}
+                            child_grp = child_data.get("conflict_group")
+                            if isinstance(child_grp, (list, set, tuple)) and str(cid) in {str(x) for x in child_grp}:
+                                additional_sources.add(v)
+                sub_nodes.update(additional_sources)
 
             # 4) Collect edges among sub_nodes (deps and sources)
             edges = []
