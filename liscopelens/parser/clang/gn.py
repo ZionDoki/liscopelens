@@ -35,6 +35,7 @@ from typing import Optional, Set, Dict, List, Tuple, Deque
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from enum import Enum
 
 import networkx as nx
 
@@ -56,6 +57,7 @@ except ImportError:
 from liscopelens.parser.base import BaseParser
 from liscopelens.utils.graph import GraphManager, Vertex, Edge
 
+match_set = set()
 
 @dataclass
 class ParseStats:
@@ -72,6 +74,25 @@ class ParseStats:
     def get_hit_rate(self) -> float:
         total = self.cache_hits + self.cache_misses
         return (self.cache_hits / total * 100) if total > 0 else 0.0
+
+
+class FileProcessingState(Enum):
+    """File processing states for tracking."""
+    UNPROCESSED = "unprocessed"
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    PROCESSED = "processed"
+
+
+@dataclass
+class ProcessingTask:
+    """Represents a file processing task in the queue."""
+    file_path: Path
+    depth: int
+    parent_nodes: Set[str]
+    target_parents: Set[str]
+    is_header: bool = False
+    source_of_header: Optional[str] = None  # If this is a source file found for a header
 
 
 class IncludeParser:
@@ -108,13 +129,13 @@ class IncludeParser:
         path_str = str(file_path)
         if path_str in self._include_cache:
             self.stats.cache_hits += 1
-            self.stats.files_parsed += 1  # Count files even when cached
+            # Don't count cached files as "parsed" - they were already parsed before
             includes = self._include_cache[path_str]
-            self.stats.includes_found += len(includes)  # Count includes from cache
+            # Still count includes found for statistics
             return includes
 
         self.stats.cache_misses += 1
-        self.stats.files_parsed += 1
+        
 
         includes = set()
 
@@ -142,6 +163,7 @@ class IncludeParser:
 
         # Manage cache size with LRU eviction
         self._add_to_cache(path_str, includes)
+        self.stats.files_parsed += 1  # Only count actual parsing, not cache hits
         return includes
 
     def _parse_includes_from_tree(self, tree, content: str) -> Set[str]:
@@ -225,87 +247,195 @@ class IncludeResolver:
     def __init__(self, include_parser: IncludeParser):
         self.include_parser = include_parser
         # Cache for resolved paths
-        self._resolved_cache: Dict[Tuple[str, tuple], Optional[Path]] = {}
+        self._resolved_cache: Dict[Tuple[str, tuple], Set[Path]] = {}
         # Cache for source file lookups
         self._source_file_cache: Dict[str, Set[str]] = {}
+        # Cache directory contents for fast lookups
+        self._dir_contents_cache: Dict[str, Dict[str, Path]] = {}
+        # Track resolved includes locally
+        self.local_includes_resolved = 0
 
-    def resolve_include_path(self, include: str, include_dirs: List[str], project_path: Path) -> Optional[Path]:
+    def _get_directory_contents(self, directory: Path, max_depth: int = 3) -> Dict[str, Path]:
+        """Get all files in directory with caching and depth limit."""
+        dir_str = str(directory)
+        if dir_str in self._dir_contents_cache:
+            return self._dir_contents_cache[dir_str]
+        
+        contents = {}
+        try:
+            # Use iterative BFS with depth limit instead of recursive walk
+            queue = deque([(directory, 0)])
+            visited = set()
+            
+            while queue:
+                current_dir, depth = queue.popleft()
+                
+                if depth > max_depth or str(current_dir) in visited:
+                    continue
+                    
+                visited.add(str(current_dir))
+                
+                try:
+                    for entry in current_dir.iterdir():
+                        if entry.is_file():
+                            contents[entry.name] = entry
+                        elif entry.is_dir() and depth < max_depth:
+                            queue.append((entry, depth + 1))
+                except (OSError, PermissionError):
+                    continue
+                    
+        except Exception:
+            pass
+        
+        self._dir_contents_cache[dir_str] = contents
+        return contents
+
+    def resolve_include_path(
+        self, 
+        include: str, 
+        include_dirs: List[str], 
+        project_path: Path, 
+        base_file_path: Optional[Path] = None
+    ) -> Set[Path]:
         """Resolve an include path against include directories.
-
-        Returns the first matching file path or None if not found.
+        
+        Priority order:
+        1. Directory of the including file (if base_file_path provided)
+        2. Include directories in order
         """
-        # Create cache key
-        cache_key = (include, tuple(include_dirs))
+        cache_key = (
+            include,
+            tuple(include_dirs),
+            str(base_file_path) if base_file_path else ""
+        )
+        
         if cache_key in self._resolved_cache:
-            return self._resolved_cache[cache_key]
+            cached_result = self._resolved_cache[cache_key]
+            if cached_result:
+                self.local_includes_resolved += len(cached_result)
+            return cached_result
 
-        result = None
+        matched_files = set()
+        
+        # Check if include has path components
+        has_path = "/" in include or "\\" in include
+        include_path = Path(include)
+        include_name = include_path.name
+        
+        # Priority 1: Directory of the including file (for local includes)
+        if base_file_path and base_file_path.parent.exists():
+            base_dir = base_file_path.parent
+            
+            if has_path:
+                # Try direct path resolution
+                full_path = base_dir / include
+                if self.include_parser.file_exists_cached(full_path):
+                    matched_files.add(full_path)
+            else:
+                # Check directory contents
+                contents = self._get_directory_contents(base_dir, max_depth=10)
+                if include_name in contents:
+                    matched_files.add(contents[include_name])
+            
+            # If found locally, return immediately (common case optimization)
+            if matched_files:
+                self._resolved_cache[cache_key] = matched_files
+                self.local_includes_resolved += len(matched_files)
+                return matched_files
+        
+        # Priority 2: Include directories
         for inc_dir in include_dirs:
-            # Handle GN-style paths
             if inc_dir.startswith("//"):
                 base_path = project_path / inc_dir[2:]
             else:
                 base_path = Path(inc_dir)
                 if not base_path.is_absolute():
                     base_path = project_path / base_path
-
-            # Try to resolve the include
-            full_path = base_path / include
-
-            # Use cached existence check
-            # TODO: try match all probable paths with no break
-            if self.include_parser.file_exists_cached(full_path):
-                result = full_path
-                self.include_parser.stats.includes_resolved += 1
+            
+            if not base_path.exists():
+                continue
+            
+            if has_path:
+                # Try direct path resolution
+                full_path = base_path / include
+                if self.include_parser.file_exists_cached(full_path):
+                    matched_files.add(full_path)
+            else:
+                # Search in directory contents
+                contents = self._get_directory_contents(base_path, max_depth=10)
+                if include_name in contents:
+                    matched_files.add(contents[include_name])
+            
+            # Early exit if we found something
+            if matched_files:
                 break
+        
+        # Cache and return
+        self._resolved_cache[cache_key] = matched_files
+        
+        if matched_files:
+            self.local_includes_resolved += len(matched_files)
 
-        self._resolved_cache[cache_key] = result
-        return result
+        match_set.update(matched_files)
+        
+        return matched_files
 
-    def find_source_for_header(self, header_path: Path) -> Set[Path]:
+    def find_source_for_header(
+        self, 
+        header_path: Path, 
+        include_dirs: List[str] = None, 
+        project_path: Path = None
+    ) -> Set[Path]:
         """Find corresponding source files for a header file.
-
-        Looks for source files with the same base name in:
-        1. Same directory as header
-        2. Parent directory
-        3. Sibling 'src' or 'source' directories
+        
+        Searches all potential locations and collects all matching source files
+        to avoid missing any possible matches. Allows some redundancy to ensure
+        completeness.
         """
         header_str = str(header_path)
         if header_str in self._source_file_cache:
             return set(Path(p) for p in self._source_file_cache[header_str])
 
-        source_files = set()
+        if include_dirs is None:
+            include_dirs = []
+        if project_path is None:
+            project_path = Path.cwd()
 
-        # Get the base name without extension
         base_name = header_path.stem
+        source_files = set()
+        
+        # Collect all potential search directories
+        search_paths = []
+        
+        # Add header's directory
         header_dir = header_path.parent
-
-        # Directories to search
-        search_dirs = [
-            header_dir,  # Same directory
-            header_dir.parent,  # Parent directory
-        ]
-
-        # Add common source directories if they exist
-        for subdir in ["src", "source", "sources", "lib", "impl"]:
-            potential = header_dir.parent / subdir
-            if potential.exists():
-                search_dirs.append(potential)
-            # Also check sibling directories
-            potential = header_dir / subdir
-            if potential.exists():
-                search_dirs.append(potential)
-
-        # Search for source files
-        for dir_path in search_dirs:
-            if not dir_path.exists():
-                continue
-
-            for ext in self.SOURCE_EXTENSIONS:
-                potential_source = dir_path / f"{base_name}{ext}"
-                if self.include_parser.file_exists_cached(potential_source):
-                    source_files.add(potential_source)
-
+        if header_dir.exists():
+            search_paths.append((header_dir, 0))  # (path, max_depth)
+        
+        # Add header's parent directory 
+        if header_dir.parent.exists():
+            parent_dir = header_dir.parent
+            search_paths.append((parent_dir, 10))
+        
+        # Add all include directories
+        for inc_dir in include_dirs:
+            if inc_dir.startswith("//"):
+                base_path = project_path / inc_dir[2:]
+            else:
+                base_path = Path(inc_dir)
+                if not base_path.is_absolute():
+                    base_path = project_path / base_path
+            
+            if base_path.exists():
+                search_paths.append((base_path, 2))
+        
+        # Search all paths and collect all matching source files
+        for search_path, max_depth in search_paths:
+            contents = self._get_directory_contents(search_path, max_depth=max_depth)
+            for _, filepath in contents.items():
+                if filepath.stem == base_name and filepath.suffix in self.SOURCE_EXTENSIONS:
+                    source_files.add(filepath)
+        
         # Cache the result
         self._source_file_cache[header_str] = {str(p) for p in source_files}
         return source_files
@@ -314,6 +444,7 @@ class IncludeResolver:
         """Clear resolver caches."""
         self._resolved_cache.clear()
         self._source_file_cache.clear()
+        self._dir_contents_cache.clear()
 
 
 @dataclass
@@ -324,7 +455,7 @@ class FileNode:
     depth: int
     parents: Set[str] = field(default_factory=set)  # All parent nodes that include this file
     target_parents: Set[str] = field(default_factory=set)  # Original target nodes
-    in_progress: bool = False  # For cycle detection
+    processing_state: FileProcessingState = FileProcessingState.UNPROCESSED
 
 
 class DAGIncludeProcessor:
@@ -334,8 +465,13 @@ class DAGIncludeProcessor:
         self.include_parser = include_parser
         self.include_resolver = include_resolver
         self.file_nodes: Dict[str, FileNode] = {}
-        self.processing_stack: Set[str] = set()  # For cycle detection
+        self.processing_queue: Deque[ProcessingTask] = deque()
+        self.processed_files: Set[str] = set()  # Files that have been fully processed
+        self.queued_files: Set[str] = set()  # Files currently in queue
         self.stats = ParseStats()
+        # Local stats tracking
+        self.local_files_parsed = 0
+        self.local_includes_found = 0
         
     def process_includes_dag(
         self,
@@ -345,129 +481,278 @@ class DAGIncludeProcessor:
         ctx: GraphManager,
         target_name: str,
         max_depth: int,
+        find_source_files: bool = True,
         progress_callback=None
     ) -> None:
-        """Process includes while maintaining DAG property."""
+        """Process includes while maintaining DAG property with proper task queue management."""
         if not initial_files or not include_dirs:
             return
-            
+        
+        # Reset local counters for this target
+        self.local_files_parsed = 0
+        self.local_includes_found = 0
+        
         # Initialize queue with source files
-        queue: Deque[Tuple[str, int, Set[str], Set[str]]] = deque()
-        
         for src_file in initial_files:
-            if str(src_file) not in self.file_nodes:
-                queue.append((src_file, 0, {target_name}, {target_name}))
+            # Resolve file path to check if it's a header
+            if src_file.startswith("//"):
+                file_path = project_path / src_file[2:]
+            else:
+                print(src_file)
+                file_path = Path(src_file)
+                if not file_path.is_absolute():
+                    file_path = project_path / file_path
+            
+            # If initial file is a header, find corresponding source files
+            if find_source_files and file_path.suffix in IncludeResolver.HEADER_EXTENSIONS:
+                source_files = self.include_resolver.find_source_for_header(
+                    file_path, include_dirs, project_path
+                )
                 
-        find_source_files = True
+                # Enqueue source files
+                for source_file in source_files:
+                    self._enqueue_file(
+                        file_path=source_file,
+                        depth=0,
+                        parent_nodes={target_name},
+                        target_parents={target_name},
+                        is_header=False,
+                        source_of_header=str(file_path)
+                    )
+            # Always enqueue the file itself (remove the has_node check)
+            self._enqueue_file(
+                file_path=file_path,
+                depth=0,
+                parent_nodes={target_name},
+                target_parents={target_name},
+                is_header=file_path.suffix in IncludeResolver.HEADER_EXTENSIONS
+            )
         
-        while queue:
-            file_path, depth, parent_nodes, target_parents = queue.popleft()
+        # Process queue
+        while self.processing_queue:
+            task = self.processing_queue.popleft()
             
             # Skip if depth exceeded
-            if max_depth > 0 and depth >= max_depth:
+            if max_depth > 0 and task.depth >= max_depth:
                 continue
-                
-            path_str = str(file_path)
             
-            # Check for cycles
-            if path_str in self.processing_stack:
-                self.stats.cycles_detected += 1
+            path_str = str(task.file_path)
+            
+            # Remove from queued set as we're processing it now
+            self.queued_files.discard(path_str)
+            
+            # Skip if already fully processed
+            if path_str in self.processed_files:
+                # Just update parent connections if needed
+                if path_str in self.file_nodes:
+                    node = self.file_nodes[path_str]
+                    node.parents.update(task.parent_nodes)
+                    node.target_parents.update(task.target_parents)
                 continue
-                
-            # Update or create file node
-            if path_str in self.file_nodes:
-                node = self.file_nodes[path_str]
-                # Skip if already processed at this or lower depth
-                if node.depth <= depth:
-                    # Just update parent connections
-                    node.parents.update(parent_nodes)
-                    node.target_parents.update(target_parents)
-                    continue
-                # Update depth and parents
-                node.depth = depth
-                node.parents.update(parent_nodes)
-                node.target_parents.update(target_parents)
-            else:
-                # All source files should have type "code"
-                file_type = "code"
-                    
-                node = FileNode(
-                    path=path_str,
-                    file_type=file_type,
-                    depth=depth,
-                    parents=parent_nodes.copy(),
-                    target_parents=target_parents.copy()
-                )
-                self.file_nodes[path_str] = node
-                
-            # Add to processing stack for cycle detection
-            self.processing_stack.add(path_str)
             
-            try:
-                # Resolve file path
-                if isinstance(file_path, str):
-                    if file_path.startswith("//"):
-                        resolved_path = project_path / file_path[2:]
-                    else:
-                        resolved_path = Path(file_path)
-                        if not resolved_path.is_absolute():
-                            resolved_path = project_path / resolved_path
-                else:
-                    resolved_path = file_path
-                    
-                # Skip non-C/C++ files
-                if not any(
-                    str(resolved_path).endswith(ext)
-                    for ext in IncludeResolver.SOURCE_EXTENSIONS | IncludeResolver.HEADER_EXTENSIONS
-                ):
-                    continue
-                    
-                # Create vertex for this file
-                self._ensure_vertex_safe(ctx, path_str, node.file_type, project_path)
-                self.stats.nodes_created += 1
-                
-                # Connect to all target parents (original targets that led to this file)
-                for target_parent in target_parents:
-                    self._ensure_edge_safe(ctx, target_parent, path_str, label="includes")
-                    self.stats.edges_created += 1
-                    
-                # Extract includes
-                includes = self.include_parser.extract_includes(resolved_path)
-                
-                # Process each include
-                for include in includes:
-                    # Resolve include path
-                    resolved_include = self.include_resolver.resolve_include_path(
-                        include, include_dirs, project_path
-                    )
-                    
-                    if resolved_include:
-                        resolved_str = str(resolved_include)
-                        
-                        # Check if this would create a cycle
-                        if resolved_str not in self.processing_stack:
-                            # Add to queue with updated parent information
-                            new_parents = {path_str}
-                            queue.append((resolved_include, depth + 1, new_parents, target_parents))
-                            
-                        # Find corresponding source files for headers
-                        if find_source_files and node.file_type == "header":
-                            source_files = self.include_resolver.find_source_for_header(resolved_include)
-                            for source_file in source_files:
-                                source_str = str(source_file)
-                                if source_str not in self.processing_stack:
-                                    queue.append((source_file, depth + 1, {resolved_str}, target_parents))
-                                    
-            finally:
-                # Remove from processing stack
-                self.processing_stack.discard(path_str)
-                
+            # Process the file
+            self._process_single_file(
+                task=task,
+                include_dirs=include_dirs,
+                project_path=project_path,
+                ctx=ctx,
+                find_source_files=find_source_files
+            )
+            
+            # Mark as processed
+            self.processed_files.add(path_str)
+            
+            # Only count files that were discovered through includes (depth > 0)
+            if task.depth > 0:
+                self.local_files_parsed += 1
+            
             # Update progress if callback provided
             if progress_callback:
                 progress_callback(self.stats)
+        
+        # Update total stats
+        self.stats.files_parsed = self.local_files_parsed
+        self.stats.includes_found = self.local_includes_found
+    
+    def _to_gn_format(self, path: str, project_path: Path) -> str:
+        """Convert a file path to GN format relative to project root."""
+        if path.startswith("//"):
+            return path
+        
+        # Handle paths that already start with backslashes
+        if path.startswith("\\\\"):
+            # Remove leading backslashes and convert to forward slashes
+            clean_path = path.lstrip("\\").replace("\\", "/")
+            return "//" + clean_path
+        elif path.startswith("\\"):
+            # Handle single backslash prefix
+            clean_path = path.lstrip("\\").replace("\\", "/")
+            return "//" + clean_path
+            
+        try:
+            path_obj = Path(path)
+            if path_obj.is_absolute():
+                relative_path = path_obj.relative_to(project_path)
+                return "//" + str(relative_path).replace("\\", "/")
+            else:
+                return "//" + path.replace("\\", "/")
+        except ValueError:
+            # If cannot make relative, still try to clean up the format
+            return "//" + path.replace("\\", "/").lstrip("/")
+    
+    def _enqueue_file(
+        self,
+        file_path,
+        depth: int,
+        parent_nodes: Set[str],
+        target_parents: Set[str],
+        is_header: bool = False,
+        source_of_header: Optional[str] = None
+    ) -> None:
+        """Add a file to the processing queue if not already queued or processed."""
+        path_str = str(file_path)
+        
+        # Skip if already processed or queued
+        if path_str in self.processed_files or path_str in self.queued_files:
+            # Update parent relationships if file exists
+            if path_str in self.file_nodes:
+                node = self.file_nodes[path_str]
+                node.parents.update(parent_nodes)
+                node.target_parents.update(target_parents)
+            return
+        
+        # Create task and add to queue
+        task = ProcessingTask(
+            file_path=file_path if isinstance(file_path, Path) else Path(file_path),
+            depth=depth,
+            parent_nodes=parent_nodes.copy(),
+            target_parents=target_parents.copy(),
+            is_header=is_header,
+            source_of_header=source_of_header
+        )
+        
+        self.processing_queue.append(task)
+        self.queued_files.add(path_str)
+    
+    def _process_single_file(
+        self,
+        task: ProcessingTask,
+        include_dirs: List[str],
+        project_path: Path,
+        ctx: GraphManager,
+        find_source_files: bool
+    ) -> None:
+        """Process a single file from the task queue."""
+        # Resolve file path first
+        if isinstance(task.file_path, str):
+            if task.file_path.startswith("//"):
+                resolved_path = project_path / task.file_path[2:]
+            else:
+                resolved_path = Path(task.file_path)
+                if not resolved_path.is_absolute():
+                    resolved_path = project_path / resolved_path
+        else:
+            resolved_path = task.file_path
+        
+        # Skip non-C/C++ files
+        if not any(
+            str(resolved_path).endswith(ext)
+            for ext in IncludeResolver.SOURCE_EXTENSIONS | IncludeResolver.HEADER_EXTENSIONS
+        ):
+            return
+        
+        # Convert to GN format for consistency
+        gn_path_str = self._to_gn_format(str(resolved_path), project_path)
+        
+        # Update or create file node
+        if gn_path_str in self.file_nodes:
+            node = self.file_nodes[gn_path_str]
+            node.depth = min(node.depth, task.depth)
+            node.parents.update(task.parent_nodes)
+            node.target_parents.update(task.target_parents)
+        else:
+            # Determine file type
+            if task.file_path.suffix in IncludeResolver.HEADER_EXTENSIONS:
+                file_type = "header"
+            else:
+                file_type = "code"
+            
+            node = FileNode(
+                path=gn_path_str,
+                file_type=file_type,
+                depth=task.depth,
+                parents=task.parent_nodes.copy(),
+                target_parents=task.target_parents.copy(),
+                processing_state=FileProcessingState.PROCESSING
+            )
+            self.file_nodes[gn_path_str] = node
+        
+        # Only create vertex if it doesn't exist (avoid duplicates from Phase 1)
+        if not ctx.graph.has_node(gn_path_str):
+            self._ensure_vertex_safe(ctx, gn_path_str, node.file_type, project_path)
+            self.stats.nodes_created += 1
+        
+        # Create edges for ALL files to their target parents (GN task nodes)
+        # This ensures all files discovered through includes are connected to the GN task
+        for target_parent in task.target_parents:
+            if not ctx.graph.has_edge(target_parent, gn_path_str):
+                self._ensure_edge_safe(ctx, target_parent, gn_path_str, label="sources")
+                self.stats.edges_created += 1
+        
+        # Extract includes from this file
+        includes = self.include_parser.extract_includes(resolved_path)
+        self.local_includes_found += len(includes)
+        
+        # Process each include
+        for include in includes:
+            # Resolve include path
+            resolved_includes = self.include_resolver.resolve_include_path(
+                include, include_dirs, project_path, base_file_path=resolved_path
+            )
+            
+            # Process all resolved includes
+            for resolved_include in resolved_includes:
+                resolved_str = str(resolved_include)
                 
+                # Check for circular dependency
+                if resolved_str not in task.parent_nodes:
+                    # If this is a header file, find corresponding source files first
+                    if find_source_files and resolved_include.suffix in IncludeResolver.HEADER_EXTENSIONS:
+                        # Find source files for this header
+                        source_files = self.include_resolver.find_source_for_header(
+                            resolved_include, include_dirs, project_path
+                        )
+                        
+                        # Enqueue source files first
+                        for source_file in source_files:
+                            source_str = str(source_file)
+                            if source_str not in task.parent_nodes:
+                                self._enqueue_file(
+                                    file_path=source_file,
+                                    depth=task.depth + 1,
+                                    parent_nodes={gn_path_str},
+                                    target_parents=task.target_parents,
+                                    is_header=False,
+                                    source_of_header=resolved_str
+                                )
+                    
+                    # Then enqueue the header file itself
+                    self._enqueue_file(
+                        file_path=resolved_include,
+                        depth=task.depth + 1,
+                        parent_nodes={gn_path_str},
+                        target_parents=task.target_parents,
+                        is_header=resolved_include.suffix in IncludeResolver.HEADER_EXTENSIONS
+                    )
+                else:
+                    self.stats.cycles_detected += 1
+        
+        # Mark as processed
+        node.processing_state = FileProcessingState.PROCESSED
+    
     def _ensure_vertex_safe(self, ctx: GraphManager, name: str, vtype: str, project_path: Path) -> None:
         """Thread-safe vertex creation."""
+        # Name should already be in GN format when passed to this method
         if not ctx.graph.has_node(name):
             vertex = Vertex(name, type=vtype)
             vertex["src_path"] = self._calculate_src_path(name, project_path)
@@ -535,7 +820,7 @@ class GnParser(BaseParser):
         "--max-include-depth": {
             "type": int,
             "help": "Maximum depth for include resolution (0 = unlimited).",
-            "default": 10,
+            "default": 15,
         },
         "--max-workers": {
             "type": int,
@@ -597,6 +882,17 @@ class GnParser(BaseParser):
         """Convert a file path to GN format relative to project root."""
         if path.startswith("//"):
             return path
+        
+        # Handle paths that already start with backslashes
+        if path.startswith("\\\\"):
+            # Remove leading backslashes and convert to forward slashes
+            clean_path = path.lstrip("\\").replace("\\", "/")
+            return "//" + clean_path
+        elif path.startswith("\\"):
+            # Handle single backslash prefix
+            clean_path = path.lstrip("\\").replace("\\", "/")
+            return "//" + clean_path
+            
         try:
             path_obj = Path(path)
             if path_obj.is_absolute():
@@ -606,8 +902,8 @@ class GnParser(BaseParser):
                 # Assume it's relative to project root
                 return "//" + path.replace("\\", "/")
         except ValueError:
-            # If cannot make relative, return as is
-            return path
+            # If cannot make relative, still try to clean up the format
+            return "//" + path.replace("\\", "/").lstrip("/")
 
     def _ensure_edge(self, ctx: GraphManager, src: str, dst: str, *, label: str) -> None:
         """Create edge if it doesn't exist. Thread-safe version with locking."""
@@ -629,7 +925,7 @@ class GnParser(BaseParser):
         )
         return layout
 
-    def _update_progress_display(self, layout: Layout, progress_bars: Dict, stats: ParseStats):
+    def _update_progress_display(self, layout: Layout, stats: ParseStats):
         """Update the progress display with current statistics."""
         # Create stats table
         stats_table = Table(title="Include Processing Statistics", expand=True)
@@ -671,9 +967,12 @@ class GnParser(BaseParser):
         thread_local = threading.local()
 
         def get_thread_processor():
-            """Get or create thread-local DAG processor."""
+            """Get or create thread-local DAG processor with its own parser/resolver."""
             if not hasattr(thread_local, "processor"):
-                thread_local.processor = DAGIncludeProcessor(self._include_parser, self._include_resolver)
+                # Create thread-local instances to avoid shared state issues
+                thread_parser = IncludeParser()
+                thread_resolver = IncludeResolver(thread_parser)
+                thread_local.processor = DAGIncludeProcessor(thread_parser, thread_resolver)
             return thread_local.processor
 
         def process_target_batch(batch: List[Tuple[str, Dict]]) -> ParseStats:
@@ -682,12 +981,20 @@ class GnParser(BaseParser):
             batch_stats = ParseStats()
             
             for target_name, meta in batch:
+                # CRITICAL: Reset processor state for each target
+                processor.processed_files.clear()
+                processor.queued_files.clear()
+                processor.file_nodes.clear()
+                processor.processing_queue.clear()
+
                 try:
                     sources = meta.get("sources", [])
                     include_dirs = meta.get("include_dirs", [])
-                    max_depth = getattr(self.args, "max_include_depth", 10)
-                    
+                    max_depth = getattr(self.args, "max_include_depth", 15)
+                    find_source_files = getattr(self.args, "find_source_files", True)
+
                     if sources and include_dirs:
+                        # Process this target
                         processor.process_includes_dag(
                             set(sources),
                             include_dirs,
@@ -695,26 +1002,34 @@ class GnParser(BaseParser):
                             ctx,
                             target_name,
                             max_depth,
+                            find_source_files=find_source_files,
                             progress_callback=None
                         )
-                        
-                    # Aggregate stats
-                    batch_stats.files_parsed += processor.stats.files_parsed
-                    batch_stats.includes_found += processor.stats.includes_found
-                    batch_stats.includes_resolved += processor.stats.includes_resolved
-                    batch_stats.cycles_detected += processor.stats.cycles_detected
-                    batch_stats.nodes_created += processor.stats.nodes_created
-                    batch_stats.edges_created += processor.stats.edges_created
                     
                 except Exception as e:
                     console.print(f"[red]Error processing {target_name}: {e}[/red]")
+            
+            # Return aggregated stats from this thread's processor
+            batch_stats.files_parsed = processor.include_parser.stats.files_parsed
+            batch_stats.includes_found = processor.include_parser.stats.includes_found
+            batch_stats.includes_resolved = processor.include_resolver.local_includes_resolved
+            batch_stats.cache_hits = processor.include_parser.stats.cache_hits
+            batch_stats.cache_misses = processor.include_parser.stats.cache_misses
+            batch_stats.cycles_detected = processor.stats.cycles_detected
+            batch_stats.nodes_created = processor.stats.nodes_created
+            batch_stats.edges_created = processor.stats.edges_created
                     
             return batch_stats
 
         # Split targets into batches for workers
         target_items = list(targets_with_sources.items())
-        batch_size = max(1, len(target_items) // (max_workers * 4))
+        # Smaller batch size for better progress granularity
+        batch_size = max(1, len(target_items) // (max_workers * 10))
         batches = [target_items[i : i + batch_size] for i in range(0, len(target_items), batch_size)]
+
+        # Reset global stats
+        self._global_stats = ParseStats()
+        completed_targets = 0
 
         # Process batches in parallel with enhanced progress display
         with Progress(
@@ -743,17 +1058,18 @@ class GnParser(BaseParser):
                     try:
                         batch_stats = future.result()
                         
-                        # Update global stats from batch_stats for cycles, nodes, edges
+                        # Aggregate stats from this batch
+                        self._global_stats.files_parsed += batch_stats.files_parsed
+                        self._global_stats.includes_found += batch_stats.includes_found
+                        self._global_stats.includes_resolved += batch_stats.includes_resolved
                         self._global_stats.cycles_detected += batch_stats.cycles_detected
                         self._global_stats.nodes_created += batch_stats.nodes_created
                         self._global_stats.edges_created += batch_stats.edges_created
+                        self._global_stats.cache_hits += batch_stats.cache_hits
+                        self._global_stats.cache_misses += batch_stats.cache_misses
                         
-                        # Update global stats from include_parser for files, includes, cache, etc.
-                        self._global_stats.files_parsed = self._include_parser.stats.files_parsed
-                        self._global_stats.includes_found = self._include_parser.stats.includes_found
-                        self._global_stats.includes_resolved = self._include_parser.stats.includes_resolved
-                        self._global_stats.cache_hits = self._include_parser.stats.cache_hits
-                        self._global_stats.cache_misses = self._include_parser.stats.cache_misses
+                        # Update completed targets
+                        completed_targets += len(batch)
                         
                         # Update progress
                         progress.update(
@@ -765,9 +1081,45 @@ class GnParser(BaseParser):
                         
                     except Exception as e:
                         console.print(f"[red]Batch processing failed: {e}[/red]")
-                        progress.update(task, advance=len(batch))
+                        completed_targets += len(batch)
+                        progress.update(
+                            task, 
+                            advance=len(batch)
+                        )
 
-    def _get_graph_stats(self, ctx: GraphManager, targets: dict[str, dict]) -> dict:
+    def _print_stats_table(self, stats: dict, title: str) -> None:
+        """Print statistics in a 6-column format (3 stats per row)."""
+        console = Console()
+        table = Table(title=title, expand=True)
+        
+        # Add 6 columns: 3 pairs of (Statistic, Value)
+        table.add_column("Statistic 1", style="cyan", width=20)
+        table.add_column("Value 1", style="green", width=8)
+        table.add_column("Statistic 2", style="cyan", width=20)
+        table.add_column("Value 2", style="green", width=8)
+        table.add_column("Statistic 3", style="cyan", width=20)
+        table.add_column("Value 3", style="green", width=8)
+        
+        stats_items = list(stats.items())
+        
+        # Group stats into rows of 3
+        for i in range(0, len(stats_items), 3):
+            row_items = stats_items[i:i+3]
+            
+            # Pad the row if needed
+            while len(row_items) < 3:
+                row_items.append(("", ""))
+            
+            # Create the row
+            row = []
+            for stat, value in row_items:
+                row.extend([str(stat), str(value)])
+            
+            table.add_row(*row)
+        
+        console.print(table)
+
+    def _get_graph_stats(self, ctx: GraphManager, targets: dict[str, dict] = None) -> dict:
         """Get detailed graph statistics."""
         total_nodes = len(ctx.nodes())
         total_edges = len(list(ctx.edges()))
@@ -824,10 +1176,10 @@ class GnParser(BaseParser):
         console = Console()
         table = Table(title="Graph Changes Before and After Group Removal")
 
-        table.add_column("Statistic", style="cyan")
-        table.add_column("Before Merge", style="green")
-        table.add_column("After Merge", style="red")
-        table.add_column("Change", style="yellow")
+        table.add_column("Statistic", style="cyan", width=25)
+        table.add_column("Before", style="green", width=10)
+        table.add_column("After", style="red", width=10)
+        table.add_column("Change", style="yellow", width=10)
 
         for key in before_stats.keys():
             before_val = before_stats.get(key, 0)
@@ -914,8 +1266,8 @@ class GnParser(BaseParser):
 
         with open(gn_file, "r", encoding="utf-8") as fp:
             gn_data = json.load(fp)
-        targets: dict[str, dict] = gn_data["targets"]
 
+        targets: dict[str, dict] = gn_data["targets"]
         console.print(f"[cyan]Processing {len(targets)} targets...[/cyan]")
 
         # Phase 1: Build basic graph structure
@@ -943,6 +1295,11 @@ class GnParser(BaseParser):
                     
                 progress.update(task, advance=1)
 
+        # Print Phase 1 statistics
+        console.print("\n[green]Phase 1 completed - Basic dependency graph built![/green]")
+        phase1_stats = self._get_graph_stats(context, targets)
+        self._print_stats_table(phase1_stats, "Phase 1 Graph Statistics")
+
         # Phase 2: Parse includes with DAG guarantee
         if parse_includes:
             if HAS_TREE_SITTER:
@@ -951,19 +1308,17 @@ class GnParser(BaseParser):
                 # Print final statistics
                 console.print("\n[green]Include processing complete![/green]")
                 
-                stats_table = Table(title="Final Processing Statistics")
-                stats_table.add_column("Metric", style="cyan")
-                stats_table.add_column("Value", style="green")
-
-                stats_table.add_row("Files Parsed", f"{self._global_stats.files_parsed:,}")
-                stats_table.add_row("Includes Found", f"{self._global_stats.includes_found:,}")
-                stats_table.add_row("Includes Resolved", f"{self._global_stats.includes_resolved:,}")
-                stats_table.add_row("Cache Hit Rate", f"{self._global_stats.get_hit_rate():.1f}%")
-                stats_table.add_row("Cycles Detected/Avoided", f"{self._global_stats.cycles_detected:,}")
-                stats_table.add_row("Nodes Created", f"{self._global_stats.nodes_created:,}")
-                stats_table.add_row("Edges Created", f"{self._global_stats.edges_created:,}")
-
-                console.print(stats_table)
+                include_stats = {
+                    "Files Parsed": f"{self._global_stats.files_parsed:,}",
+                    "Includes Found": f"{self._global_stats.includes_found:,}",
+                    "Includes Resolved": f"{self._global_stats.includes_resolved:,}",
+                    "Cache Hit Rate": f"{self._global_stats.get_hit_rate():.1f}%",
+                    "Cycles Detected/Avoided": f"{self._global_stats.cycles_detected:,}",
+                    "Nodes Created": f"{self._global_stats.nodes_created:,}",
+                    "Edges Created": f"{self._global_stats.edges_created:,}"
+                }
+                
+                self._print_stats_table(include_stats, "Include Processing Statistics")
             else:
                 console.print("[yellow]tree-sitter-cpp not installed. Skipping include parsing.[/yellow]")
                 console.print("[yellow]Install with: pip install tree-sitter tree-sitter-cpp[/yellow]")
@@ -981,18 +1336,12 @@ class GnParser(BaseParser):
 
         # Print final graph statistics
         final_stats = self._get_graph_stats(context, targets)
-        table = Table(title="Final Graph Statistics")
-        table.add_column("Statistic", style="cyan")
-        table.add_column("Value", style="green")
-        for key, value in final_stats.items():
-            table.add_row(str(key), str(value))
-        console.print(table)
+        self._print_stats_table(final_stats, "Final Graph Statistics")
 
         # Verify DAG property
         if nx.is_directed_acyclic_graph(context.graph):
             console.print("[green]✓ Graph is a valid DAG (no cycles detected)[/green]")
         else:
             console.print("[red]⚠ Warning: Graph contains cycles![/red]")
-            
-        return context
 
+        return context
