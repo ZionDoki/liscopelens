@@ -612,3 +612,11 @@ class GraphManager:
     def load_from_disk(cls, file_path: str):
         """load the graph from the file."""
         return cls(file_path)
+
+    def create_vertex(self, label: str, **kwargs: Any) -> Vertex:
+        """Create a vertex"""
+        return Vertex(label, parser_name=self.__class__.__name__, **kwargs)
+
+    def create_edge(self, u: str, v: str, **kwargs: Any) -> Edge:
+        """Create an edge between two vertices"""
+        return Edge(u, v, parser_name=self.__class__.__name__, **kwargs)

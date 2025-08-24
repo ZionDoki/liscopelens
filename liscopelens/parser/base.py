@@ -40,8 +40,6 @@ class BaseParser(ABC):
         - normalize_path: Normalize the given path to ensure it is absolute and properly formatted.
         - path2gnlike: Convert a normalized path to a GNLike format path.
         - gnlike2path: Convert a GNLike format path back to a normalized path.
-        - create_vertex: Create a vertex with the given label and additional properties.
-        - create_edge: Create an edge between two vertices with additional properties.
 
     Abstract Methods:
         - parse: Parse the arguments and update the context (GraphManager) of the project.
@@ -84,15 +82,7 @@ class BaseParser(ABC):
 
         relative_path = Path(gnlike_path[2:])
         return root_path / relative_path
-
-    def create_vertex(self, label: str, **kwargs: Any) -> Vertex:
-        """Create a vertex"""
-        return Vertex(label, parser_name=self.__class__.__name__, **kwargs)
-
-    def create_edge(self, u: str, v: str, **kwargs: Any) -> Edge:
-        """Create an edge between two vertices"""
-        return Edge(u, v, parser_name=self.__class__.__name__, **kwargs)
-
+        
     @abstractmethod
     def parse(self, project_path: Path, context: Optional[GraphManager] = None) -> GraphManager:
         """
