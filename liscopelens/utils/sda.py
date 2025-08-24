@@ -18,7 +18,6 @@ import tree_sitter_cpp as tsc
 from tree_sitter import Parser, Language
 
 
-
 class BaseStaticDepExtractor:
     """
     Base class for static dependency extractors.
@@ -34,11 +33,33 @@ class BaseStaticDepExtractor:
         parse: Parse a file and extract its dependencies
     """
 
+    parser_type: str
+
     def __init__(self, language: Optional[Language] = None):
         if Parser is not None and language is not None:
             self.parser = Parser(language)
         else:
             self.parser = None
+
+        self.supported_extensions: Set[str] = set()
+
+    def can_handle_file(self, file_path: str) -> bool:
+        """
+        Router method to check if this extractor can handle the given file.
+
+        Checks if the file extension is in the supported extensions set.
+
+        Args:
+            file_path (str): Path to the file to check
+
+        Returns:
+            bool: True if the file can be handled, False otherwise
+        """
+        if not self.supported_extensions:
+            return True
+
+        file_ext = Path(file_path).suffix.lower()
+        return file_ext in self.supported_extensions
 
     def fallback_extract(self, content: str) -> dict:
         """
@@ -70,11 +91,14 @@ class CDepExtractor(BaseStaticDepExtractor):
         parse: Parse C/C++ files and extract include dependencies
     """
 
+    parser_type = "c"
+
     def __init__(self, language: Optional[Language] = None):
         if language is None:
             language = Language(tsc.language())
         super().__init__(language)
         self.include_pattern = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', re.MULTILINE)
+        self.supported_extensions = {".c", ".cpp", ".cc", ".cxx", ".c++", ".h", ".hpp", ".hh", ".hxx", ".h++"}
 
     def fallback_extract(self, content: str) -> dict:
         """
@@ -88,8 +112,11 @@ class CDepExtractor(BaseStaticDepExtractor):
         Returns:
             dict: Dictionary with 'includes' key containing list of include paths
         """
-        includes = set(self.include_pattern.findall(content))
-        return {"includes": [Path(include) for include in includes]}
+        try:
+            includes = set(self.include_pattern.findall(content))
+            return {"includes": [Path(include) for include in includes]}
+        except Exception as e:
+            return {"error": str(e)}
 
     def _parse_includes_from_tree(self, tree, content: str) -> Set[str]:
         """
@@ -162,7 +189,7 @@ class CDepExtractor(BaseStaticDepExtractor):
 _PARSER_CACHE = {}
 
 
-def _get_parser(parser_type: str) -> BaseStaticDepExtractor:
+def _get_parser(parser_type: str) -> BaseStaticDepExtractor | None:
     """
     Get or create cached parser instance for worker process.
 
@@ -176,15 +203,15 @@ def _get_parser(parser_type: str) -> BaseStaticDepExtractor:
         BaseStaticDepExtractor: Cached parser instance
     """
     if parser_type not in _PARSER_CACHE:
-        if parser_type == "c":
+        if parser_type == CDepExtractor.parser_type:
             _PARSER_CACHE[parser_type] = CDepExtractor()
         else:
-            _PARSER_CACHE[parser_type] = CDepExtractor()
+            return None
 
     return _PARSER_CACHE[parser_type]
 
 
-def _worker_dispatch(task_data: Tuple[str, str]) -> dict:
+def _worker_dispatch(task_data: Tuple[str, List[str]]) -> dict:
     """
     Worker process task dispatcher function.
 
@@ -197,14 +224,17 @@ def _worker_dispatch(task_data: Tuple[str, str]) -> dict:
             - parser_type: Type of parser to use ("c" or other)
 
     Returns:
-        dict: Parse result dictionary from the cached parser
+        dict: Parse result dictionary from the cached parser or skip result for unsupported files
     """
     file_path, parser_type = task_data
 
     # Get cached parser instance for this worker process
     parser = _get_parser(parser_type)
 
-    return parser.parse(file_path)
+    if parser is not None and parser.can_handle_file(file_path):
+        return parser.parse(file_path)
+
+    return {"file": file_path, "skipped": True, "reason": "Unsupported file extension"}
 
 
 class ResultIterator:
@@ -233,13 +263,14 @@ class ResultIterator:
         Get next result from pool.
 
         Uses event-driven approach to wait for results. Will block until
-        a result is available or all tasks are completed.
+        a result is available. Only raises StopIteration when the pool
+        is sealed AND all tasks are completed.
 
         Returns:
             dict: Next parsing result
 
         Raises:
-            StopIteration: When all tasks are completed and no more results
+            StopIteration: When pool is sealed and all tasks are completed
         """
         while True:
             # Try to get existing result first (non-blocking)
@@ -247,14 +278,13 @@ class ResultIterator:
             if result is not None:
                 return result
 
-            # Check if there are still active or pending tasks
-            if self.pool.get_pending_count() == 0 and self.pool.get_active_count() == 0:
-                # All tasks completed, check one more time for any remaining results
-                result = self.pool.get_result(block=False)
-                if result is not None:
-                    return result
-                # No more results, end iteration
-                raise StopIteration
+            # Only check for completion if pool is sealed
+            if self.pool.is_sealed():
+                if self.pool.get_pending_count() == 0 and self.pool.get_active_count() == 0:
+                    result = self.pool.get_result(block=False)
+                    if result is not None:
+                        return result
+                    raise StopIteration
 
             # Wait for new result to be available (event-driven)
             if not self.pool.wait_for_result(timeout=1.0):
@@ -285,7 +315,6 @@ class AsyncParserPool:
     """
 
     def __init__(self, max_workers: int = None):
-        self.c_extensions = {".c", ".cpp", ".cc", ".cxx", ".c++", ".h", ".hpp", ".hh", ".hxx", ".h++"}
         self.max_workers = max_workers or os.cpu_count()
 
         self.task_queue = queue.Queue()  # (file_path,)
@@ -296,6 +325,7 @@ class AsyncParserPool:
         self._completion_event = threading.Event()  # All tasks completed event
         self._result_available_event = threading.Event()  # New result available event
         self._running = False
+        self._sealed = False  # Flag to control when iteration can stop
 
         self._worker_thread = None
         self._executor = None
@@ -373,16 +403,13 @@ class AsyncParserPool:
         Submit pending tasks from queue to worker processes.
 
         Processes all tasks in the queue and submits them to the process pool
-        with appropriate parser type detection.
+        with appropriate parser type detection. Filters out unsupported file
+        extensions and puts skip results directly into the result queue.
         """
         while not self.task_queue.empty():
             try:
                 file_path = self.task_queue.get_nowait()
-
-                ext = Path(file_path).suffix.lower()
-                parser_type = "c" if ext in self.c_extensions else "other"
-
-                future = self._executor.submit(_worker_dispatch, (file_path, parser_type))
+                future = self._executor.submit(_worker_dispatch, (file_path, "c"))
                 self._active_futures.append(future)
 
             except queue.Empty:
@@ -413,7 +440,7 @@ class AsyncParserPool:
 
                 completed_futures.append(future)
 
-        # Remove completed futures
+        # Remove completed futures and clean up parameter mapping
         for future in completed_futures:
             self._active_futures.remove(future)
 
@@ -466,10 +493,11 @@ class AsyncParserPool:
         Args:
             file_path (str): Path to source file to parse
         """
+        self._sealed = False
         self.task_queue.put(file_path)
         # Clear completion event since we have new tasks
         self._completion_event.clear()
-        # Notify worker thread of new task
+
         self._new_task_event.set()
 
     def add_files(self, file_paths: List[str]):
@@ -479,6 +507,7 @@ class AsyncParserPool:
         Args:
             file_paths (List[str]): List of source file paths to parse
         """
+        self._sealed = False
         for file_path in file_paths:
             self.task_queue.put(file_path)
 
@@ -503,7 +532,6 @@ class AsyncParserPool:
             self._worker_thread.join()
 
         self._running = False
-        print("Parser pool stopped")
 
     def get_pending_count(self) -> int:
         """
@@ -588,6 +616,24 @@ class AsyncParserPool:
             bool: True if pool is active, False otherwise
         """
         return self._running
+
+    def seal(self):
+        """
+        Seal the parser pool to indicate no more tasks will be added.
+
+        This must be called manually by the user before the ResultIterator
+        will raise StopIteration when all tasks are completed.
+        """
+        self._sealed = True
+
+    def is_sealed(self) -> bool:
+        """
+        Check if the parser pool has been sealed.
+
+        Returns:
+            bool: True if pool is sealed, False otherwise
+        """
+        return self._sealed
 
     def wait_for_completion(self, timeout: Optional[float] = None):
         """

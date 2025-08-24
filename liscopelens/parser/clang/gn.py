@@ -94,7 +94,7 @@ class GnParser(BaseParser):
         vertex = ctx.create_vertex(name, type=vtype)
         src_path = self._gn2abspath(name, project_path)
         if src_path.exists():
-            vertex["src_path"] = src_path
+            vertex["src_path"] = src_path.as_posix()
         ctx.add_node(vertex)
         self._visited_nodes.add(key)
 
@@ -180,7 +180,7 @@ class GnParser(BaseParser):
         ctx.add_edge(ctx.create_edge(src, dst, label=label))
         self._visited_edges.add(key)
 
-    def add_sources(self, ctx: GraphManager, tgt_name: str, sources: list[Path]) -> None:
+    def add_sources(self, ctx: GraphManager, tgt_name: str, sources: list[Path | str]) -> None:
         """
         Add source files to the specified target in the graph.
 
@@ -190,6 +190,9 @@ class GnParser(BaseParser):
             sources (List[Path]): List of source file paths to add
         """
         for src in sources:
+            if isinstance(src, Path):
+                src = src.as_posix()
+
             ctx.add_node(ctx.create_vertex(src, type="code"))
             ctx.add_edge(ctx.create_edge(tgt_name, src, label="sources"))
 
@@ -291,6 +294,7 @@ class GnParser(BaseParser):
             console=console,
         ) as progress:
             task = progress.add_task("[green]Parsing includes...", total=len(target_nodes_with_includes), files_added=0)
+
             for tgt in target_nodes_with_includes:
 
                 candidate_sources = defaultdict(list)
@@ -301,7 +305,6 @@ class GnParser(BaseParser):
                         suffix=self._c_header_suffix + self._c_source_suffix,
                         stem_dict=candidate_sources,
                     )
-
                 self._parser_pool.add_files([self._gn2abspath(src, project_path) for src in tgt["sources"]])
 
                 for result in self._parser_pool.results():
@@ -309,21 +312,29 @@ class GnParser(BaseParser):
                         for include_path in result["includes"]:
                             include_without_suffix = include_path.with_suffix("")
                             candidates = candidate_sources[include_without_suffix.stem]
-                            for idx, source_file in enumerate(candidates):
+                            idx = 0
+                            while idx < len(candidates):
+                                source_file = candidates[idx]
                                 if path_endswith(source_file.with_suffix(""), include_without_suffix):
-                                    self._parser_pool.add_file(source_file)
-                                    # add source file to graph node tgt["name"]
-                                    self.add_sources(context, tgt["name"], [source_file])
                                     files_added_count += 1
-                                    # 实时更新文件计数
+                                    self.add_sources(
+                                        context,
+                                        tgt["name"],
+                                        ["//" + str(source_file.relative_to(project_path)).replace("\\", "/")],
+                                    )
                                     progress.update(task, files_added=files_added_count)
+                                    if source_file.suffix in (self._c_header_suffix + self._c_source_suffix):
+                                        self._parser_pool.add_file(source_file)
                                     del candidates[idx]
+                                else:
+                                    idx += 1
 
+                    self._parser_pool.seal()
                 progress.update(task, advance=1)
-        
+
         # Print Phase 2 completion and statistics
         console.print(f"\n[green]Phase 2 completed - 总共添加了 {files_added_count} 个文件![/green]")
-        
+
         # Verify DAG property
         if nx.is_directed_acyclic_graph(context.graph):
             console.print("[green]✓ Graph is a valid DAG (no cycles detected)[/green]")
