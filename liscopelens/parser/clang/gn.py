@@ -279,14 +279,18 @@ class GnParser(BaseParser):
             if not (ignore_test and meta.get("testonly", False)) and meta.get("include_dirs") and meta.get("sources")
         ]
 
+        # 初始化文件计数器
+        files_added_count = 0
+
         with Progress(
             TextColumn("[progress.description]{task.description}"),
+            TextColumn("[green]已添加文件: {task.fields[files_added]}[/green]"),
             TimeElapsedColumn(),
             BarColumn(),
             TimeRemainingColumn(),
             console=console,
         ) as progress:
-            task = progress.add_task("[green]Parsing includes...", total=len(target_nodes_with_includes))
+            task = progress.add_task("[green]Parsing includes...", total=len(target_nodes_with_includes), files_added=0)
             for tgt in target_nodes_with_includes:
 
                 candidate_sources = defaultdict(list)
@@ -310,9 +314,16 @@ class GnParser(BaseParser):
                                     self._parser_pool.add_file(source_file)
                                     # add source file to graph node tgt["name"]
                                     self.add_sources(context, tgt["name"], [source_file])
+                                    files_added_count += 1
+                                    # 实时更新文件计数
+                                    progress.update(task, files_added=files_added_count)
                                     del candidates[idx]
 
                 progress.update(task, advance=1)
+        
+        # Print Phase 2 completion and statistics
+        console.print(f"\n[green]Phase 2 completed - 总共添加了 {files_added_count} 个文件![/green]")
+        
         # Verify DAG property
         if nx.is_directed_acyclic_graph(context.graph):
             console.print("[green]✓ Graph is a valid DAG (no cycles detected)[/green]")

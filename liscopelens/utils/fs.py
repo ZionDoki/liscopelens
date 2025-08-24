@@ -56,6 +56,9 @@ def scan_dir(
     if not tgt_path.exists():
         return stem_dict
 
+    if not tgt_path.is_dir():
+        return stem_dict
+
     for fp in os.scandir(tgt_path):
         if fp.is_file() and (not suffix or fp.name.endswith(suffix)):
             path = Path(fp.path).resolve()
